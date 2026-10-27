@@ -1,10 +1,31 @@
-# Katman Studio 2.7 — Otomatik görselden vektör ve 3D
+# Katman Studio 2.8 — Otomatik görselden vektör ve 3D
 
 Uygulama boş açılır. Görseli ekleyin; renk ayrımı, düzgün vektör eğrileri ve ayrıntı kalitesi otomatik hazırlanır. Piksel çözünürlüğü, kenar filtresi, gölge veya Z büyütme ayarı yapmanız gerekmez.
 
 ## Açma
 
 **Baslat.bat** dosyasını veya **Masaustu/Katman Studio/Katman Studio.exe** dosyasını açın. Hazır Windows paketi Node.js, internet, sunucu veya tarayıcı gerektirmez. EXE'yi taşırken yanındaki dosyaları da içeren klasörün tamamını taşıyın.
+
+## Mac sürümü
+
+**macOS 13 Ventura veya sonrası** desteklenir. GitHub deposunun **Releases** bölümünden işlemcinize uygun paketi indirin: Apple Silicon için `arm64`, Intel Mac için `x64`. DMG dosyasını açıp **Katman Studio** simgesini **Applications / Uygulamalar** klasörüne sürükleyin. ZIP de aynı uygulamayı içerir. Kullanmak için Node.js veya sunucu kurulmaz.
+
+Mac’te kısayollar ⌘O, ⌘⇧O, ⌘S, ⌘E; çoklu seçim ⌘ ile yapılır. Kırmızı pencere düğmesi pencereyi kapatır; Dock simgesi yeni boş pencere açar. Uygulamadan tamamen çıkış ⌘Q’dur. Kaydedilmeyen çalışma pencere kapanınca kaybolur.
+
+Paketler Apple Developer ID ile imzalanmamış ve notarize edilmemiştir; ilk açılışta macOS güvenlik uyarısı gösterebilir. Resmi imzalı dağıtım için Apple geliştirici sertifikası gerekir.
+
+Mac’te kaynak koddan çalıştırmak ve paketlemek:
+
+```sh
+npm ci
+npm run build
+npm start
+# Yalnızca bu Mac’in mimarisi:
+npm run package:mac -- --arm64  # Apple Silicon
+npm run package:mac -- --x64    # Intel
+```
+
+Mimari seçilmezse iki mimari de paketlenir. Çıktılar `dist/` içine DMG ve ZIP olarak yazılır. `Baslat.command` önceden üretilmiş Mac paketini veya kurulu Electron geliştirme ortamını açar. GitHub Actions, sürüm etiketi (`v*`) gönderildiğinde her mimariyi gerçek Mac runner üzerinde derler, paketlenmiş uygulamanın seçim/kayıt/3MF ve pencereyi yeniden açma testlerini çalıştırır; iki test de geçerse dosyaları Releases bölümüne ekler. Aynı iş akışı Actions bölümünden elle de başlatılabilir (çıktılar Artifacts altında).
 
 ## Kullanım
 

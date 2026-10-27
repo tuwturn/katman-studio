@@ -3,3 +3,5 @@ node_modules/
 test-results/
 Masaustu/
 .electron-cache/
+dist/
+.DS_Store

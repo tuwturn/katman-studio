@@ -1,0 +1,33 @@
+appId: com.katman.studio
+productName: Katman Studio
+directories:
+  output: dist
+files:
+  - public/**/*
+  - desktop/**/*
+  - package.json
+  - '!node_modules/**/*'
+asar: true
+npmRebuild: false
+mac:
+  category: public.app-category.graphics-design
+  minimumSystemVersion: '13.0.0'
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]
+  artifactName: Katman-Studio-${version}-mac-${arch}.${ext}
+  identity: '-'
+  hardenedRuntime: false
+  notarize: false
+dmg:
+  title: Katman Studio
+  contents:
+    - x: 160
+      y: 180
+      type: file
+    - x: 440
+      y: 180
+      type: link
+      path: /Applications
