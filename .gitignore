@@ -1,0 +1,5 @@
+node_modules/
+.npm-cache/
+test-results/
+Masaustu/
+.electron-cache/
