@@ -32,6 +32,16 @@ try{
  await page.locator('#selection-height').fill('300');await page.locator('#apply-height').click();assert.equal(await page.locator('#selection-height').inputValue(),'250');
  await page.locator('#project-file').setInputFiles('test-results/native-250.katman');await page.waitForFunction(()=>!document.querySelector('#vectorize').disabled);await page.locator('#view-2d').click();await clickPoint(8,8);assert.equal(await page.locator('#selection-height').inputValue(),'250');
  await save('native-shortcut.katman','shortcut');
- if(process.platform==='darwin'){assert.equal(await page.evaluate(()=>document.body.classList.contains('mac')),true);assert.match(await page.locator('kbd').first().textContent(),/⌘/);await electronApp.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().forEach(w=>w.close()));assert.equal(await electronApp.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().length),0);const reopened=electronApp.waitForEvent('window');await electronApp.evaluate(({app})=>app.emit('activate'));const next=await reopened;await next.locator('#empty-state').waitFor();}
+ if(process.platform==='darwin'){
+   assert.equal(await page.evaluate(()=>document.body.classList.contains('mac')),true);
+   assert.match(await page.locator('kbd').first().textContent(),/⌘/);
+   // macOS closes windows asynchronously. Wait for actual destruction before
+   // checking Dock behavior rather than checking immediately after close().
+   await electronApp.evaluate(({BrowserWindow})=>Promise.all(BrowserWindow.getAllWindows().map(w=>new Promise(resolve=>{w.once('closed',resolve);w.close();}))));
+   assert.equal(await electronApp.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().length),0);
+   const reopened=electronApp.waitForEvent('window');
+   await electronApp.evaluate(({app})=>app.emit('activate'));
+   const next=await reopened;await next.locator('#empty-state').waitFor();
+ }
  assert.deepEqual(errors,[]);console.log('Desktop EXE OK: free 250mm heights, separate same-color islands, direct workspace color/tolerance selection, live tolerance, rectangle selection without right tabs, project roundtrip and true-scale 3MF.');
 }finally{await electronApp.close();}
