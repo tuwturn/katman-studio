@@ -1,10 +1,18 @@
-# Katman Studio 2.8 — Otomatik görselden vektör ve 3D
+# Katman Studio 2.9 — Otomatik görselden vektör ve 3D
 
 Uygulama boş açılır. Görseli ekleyin; renk ayrımı, düzgün vektör eğrileri ve ayrıntı kalitesi otomatik hazırlanır. Piksel çözünürlüğü, kenar filtresi, gölge veya Z büyütme ayarı yapmanız gerekmez.
 
 ## Açma
 
 **Baslat.bat** dosyasını veya **Masaustu/Katman Studio/Katman Studio.exe** dosyasını açın. Hazır Windows paketi Node.js, internet, sunucu veya tarayıcı gerektirmez. EXE'yi taşırken yanındaki dosyaları da içeren klasörün tamamını taşıyın.
+
+## Yerel ağdan tarayıcıyla kullanım
+
+Windows paketindeki `Masaustu/Katman Studio/Web-Sunucusu-Baslat.bat` dosyasını açın. Node.js kurmaya gerek yoktur; paketli uygulamanın çalışma ortamı kullanılır. Tarayıcı otomatik açılır ve konsolda bu bilgisayarın IP adresleri gösterilir. Aynı Wi-Fi/Ethernet ağındaki diğer bilgisayarlarda gösterilen `http://IP:PORT/` adresini açın. Sunucu penceresi açık kalmalıdır; Ctrl+C ile kapatılır. Varsayılan port 8787’dir; doluysa sonraki boş port seçilir. Özel port için `Web-Sunucusu-Baslat.bat --port 9000` kullanılabilir.
+
+Windows ağ erişim izni sorarsa güvendiğiniz özel yerel ağ için izin verin. Tarayıcılar kendi çalışmalarını tutar; cihazlar arasında proje taşımak için `.katman` dosyasını kaydedip açın. Görseller istemci tarayıcısında işlenir; sunucuya yüklenmez. Sunucu sadece uygulamanın statik dosyalarını sunar.
+
+Kaynak koddan aynı kullanım: `npm run start:web -- --lan --open`. `--lan` verilmezse yalnızca bu bilgisayarda (`127.0.0.1`) erişim açılır.
 
 ## Mac sürümü
 
