@@ -1,0 +1,37 @@
+name: macOS 3D graphics check
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  graphics:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            graphics: native
+          - runner: macos-15-intel
+            graphics: software
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm install --no-save --package-lock=false --ignore-scripts playwright@1.56.1
+      - run: node tests/mesh-editor-ui.mjs
+        env:
+          KATMAN_NATIVE: '1'
+          KATMAN_GL: ${{ matrix.graphics }}
+          PLAYWRIGHT_PATH: playwright
+          KATMAN_APP_ROOT: ${{ github.workspace }}
+          KATMAN_EXECUTABLE: ${{ github.workspace }}/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: graphics-${{ matrix.runner }}
+          path: test-results/

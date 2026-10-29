@@ -14,9 +14,11 @@ jobs:
           - runner: macos-15
             arch: arm64
             output: mac-arm64
+            graphics: native
           - runner: macos-15-intel
             arch: x64
             output: mac
+            graphics: software
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 25
     steps:
@@ -39,6 +41,7 @@ jobs:
         run: node tests/mesh-editor-ui.mjs
         env:
           KATMAN_NATIVE: '1'
+          KATMAN_GL: ${{ matrix.graphics }}
           PLAYWRIGHT_PATH: playwright
           KATMAN_EXECUTABLE: ${{ github.workspace }}/dist/${{ matrix.output }}/Katman Studio.app/Contents/MacOS/Katman Studio
       - uses: actions/upload-artifact@v4
