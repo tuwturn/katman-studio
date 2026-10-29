@@ -6,11 +6,12 @@ import Module from 'manifold-3d';
 import {STLLoader} from 'three/addons/loaders/STLLoader.js';
 import {fromSolid,toSolid} from '../src/mesh-ops.js';
 import {exportSTL,export3MF,exportOBJ} from '../src/core.js';
-import {unzipSync} from 'fflate';
+import {unzipSync,zipSync,strFromU8,strToU8} from 'fflate';
 const require=createRequire(import.meta.url),{chromium,_electron}=require(process.env.PLAYWRIGHT_PATH||'C:/Users/tuwturn/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 const wasm=await Module();wasm.setup();const M=wasm.Manifold;await mkdir('test-results',{recursive:true});
 const outer=M.cube([30,30,12]),hole=M.cube([26,26,12]).translate([2,2,2]),cup=outer.subtract(hole),letter=M.cube([4,2,1]).translate([13,14,2]),source=cup.add(letter),part={...fromSolid(source,{name:'Inner lettering'}),color:'#80a7db'};
 await writeFile('test-results/mesh-cup.stl',exportSTL([part]));await writeFile('test-results/mesh-cup.3mf',export3MF([part]));await writeFile('test-results/mesh-cup.obj',unzipSync(exportOBJ([part]))['model.obj']);
+const mirrored=unzipSync(export3MF([part]));mirrored['3D/3dmodel.model']=strToU8(strFromU8(mirrored['3D/3dmodel.model']).replace('<component objectid="3"/>','<component objectid="3" transform="-1 0 0 0 1 0 0 0 1 30 0 0"/>'));await writeFile('test-results/mesh-cup.mirror.3mf',zipSync(mirrored));
 const native=process.env.KATMAN_NATIVE==='1';
 const browser=native?await _electron.launch({executablePath:process.env.KATMAN_EXECUTABLE||path.resolve('Masaustu/Katman Studio/Katman Studio.exe'),env:{...process.env,KATMAN_TEST:'1'},args:['--enable-unsafe-swiftshader',...(process.env.CI?['--use-angle=swiftshader']:[])]}):await chromium.launch({channel:'chrome',headless:true,args:['--enable-unsafe-swiftshader']});
 try{
@@ -30,7 +31,7 @@ try{
  await ui.locator('#section-enabled').check();await ui.locator('#section-position').fill('40');await page.screenshot({path:'test-results/mesh-editor-inner-surface.png'});
  await ui.locator('#mesh-format').selectOption('stl');await save('mesh-section-view.stl');assert.deepEqual(await readFile('test-results/mesh-section-view.stl'),bytes,'section view must not physically cut the exported model');
  await page.locator('#mode-image-editor').click();assert.equal(await page.locator('main.workspace').isVisible(),true);assert.equal(await page.locator('#region-count').textContent(),'3');assert.match(await page.locator('.layer').first().textContent(),/0,16/);await page.locator('#mode-mesh-editor').click();assert.match(await ui.locator('#model-name').textContent(),/mesh-cup/);
- for(const ext of ['3mf','obj']){await ui.locator('#model-file').setInputFiles('test-results/mesh-cup.'+ext);await ui.locator('#model-name').filter({hasText:'mesh-cup.'+ext}).waitFor();await ui.locator('#split-parts').click();await ui.locator('#model-status').filter({hasText:'bağlantısız parça bulundu'}).waitFor({timeout:60000});}
+ for(const ext of ['3mf','obj','mirror.3mf']){await ui.locator('#model-file').setInputFiles('test-results/mesh-cup.'+ext);await ui.locator('#model-name').filter({hasText:'mesh-cup.'+ext}).waitFor();await ui.locator('#split-parts').click();await ui.locator('#model-status').filter({hasText:'bağlantısız parça bulundu'}).waitFor({timeout:60000});}
  await ui.locator('#delete-parts').click();await ui.locator('#model-empty').waitFor();await ui.locator('#mesh-undo').click();assert.equal(await ui.locator('#model-empty').isVisible(),false);
  assert.deepEqual(errors,[]);console.log((native?'Native EXE ':'Browser ')+'3D editor UI OK: STL/3MF/OBJ import, real inner-surface reference/rectangle, local text removal with volume proof, undo/redo, section view, all exports, mode retention and part deletion.');
 }finally{await browser.close();[outer,hole,cup,letter,source].forEach(p=>p.delete());}
