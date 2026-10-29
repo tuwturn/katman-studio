@@ -1,0 +1,103 @@
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {STLLoader} from 'three/addons/loaders/STLLoader.js';
+import {OBJLoader} from 'three/addons/loaders/OBJLoader.js';
+import {ThreeMFLoader} from 'three/addons/loaders/3MFLoader.js';
+import {unzipSync,strFromU8} from 'fflate';
+import {export3MF,exportSTL,exportOBJ} from './core.js';
+
+const $=id=>document.getElementById(id),viewport=$('model-viewport');
+let parts=[],selected=new Set(),reference=null,areas=[],history=[],future=[],sourceName='duzenlenen-model',tool='orbit',busy=false,worker,request,drag=null,flip=1;
+const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(38,1,.01,100000),renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,logarithmicDepthBuffer:true});
+camera.up.set(0,0,1);renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.localClippingEnabled=true;renderer.setClearColor(0,0);viewport.append(renderer.domElement);
+const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.minDistance=.05;controls.maxDistance=100000; // full orbit, including interior undersides
+const model=new THREE.Group(),previews=new THREE.Group();scene.add(model,previews,new THREE.AmbientLight(0xffffff,1.8));const light=new THREE.DirectionalLight(0xffffff,2.4);light.position.set(60,-80,150);scene.add(light);const fill=new THREE.DirectionalLight(0xb6ceff,1);fill.position.set(-60,80,-50);scene.add(fill);
+let grid,bounds=new THREE.Box3(new THREE.Vector3(-10,-10,-10),new THREE.Vector3(10,10,10)),clip=new THREE.Plane(),arrow;
+function status(text){$('model-status').textContent=text;}
+function fail(e){console.error(e);status(e.message||String(e));}
+function dispose(group){for(const m of [...group.children]){group.remove(m);m.geometry?.dispose();if(Array.isArray(m.material))m.material.forEach(x=>x.dispose());else m.material?.dispose();}}
+const colorHex=c=>'#'+new THREE.Color(...(c||[.48,.63,.85])).getHexString();
+function serialPart(part){return {...part,color:part.color||colorHex(part.colors?.[0]),vertexColors:part.colors?.map(colorHex)};}
+function updateUI(){
+ const any=parts.length>0,chosen=selected.size>0,hasRef=reference&&parts[reference.part],canEdit=hasRef&&areas.length>0;
+ for(const id of ['model-open','model-file'])$(id).disabled=busy;
+ for(const id of ['erase-local','fill-local'])$(id).disabled=busy||!canEdit;
+ $('delete-parts').disabled=busy||!chosen;$('split-parts').disabled=busy||selected.size!==1;
+ for(const id of ['tool-reference','model-fit','view-front','view-top-model','mesh-export'])$(id).disabled=busy||!any;
+ for(const id of ['tool-box','tool-circle','reference-view','reference-flip'])$(id).disabled=busy||!hasRef;
+ $('cancel-operation').hidden=!busy;$('mesh-undo').disabled=busy||!history.length;$('mesh-redo').disabled=busy||!future.length;
+ $('area-count').textContent=areas.length?`${areas.length} yerel alan seçildi`:'Alan seçilmedi';
+ $('model-stats').textContent=any?`${parts.length} parça · ${parts.reduce((s,p)=>s+p.triangles.length,0).toLocaleString('tr-TR')} üçgen`:'Henüz model yok';
+ $('model-empty').hidden=any;
+ const list=$('model-parts');list.replaceChildren();parts.forEach((p,i)=>{const b=document.createElement('button');b.className='part'+(selected.has(i)?' active':'');const dot=document.createElement('i');dot.style.background=colorHex(p.colors?.[0]);const name=document.createElement('span');name.textContent=p.name||`Parça ${i+1}`;b.append(dot,name);b.title=`${p.triangles.length} üçgen`;b.onclick=e=>{if(busy)return;if(e.ctrlKey||e.metaKey){selected.has(i)?selected.delete(i):selected.add(i);}else selected=new Set([i]);if(reference&&reference.part!==i)clearReference();updateHighlight();updateUI();};list.append(b);});
+}
+function updateHighlight(){model.children.forEach(m=>{m.material.emissive.set(selected.has(m.userData.part)?0x1e3960:0);m.material.emissiveIntensity=.24;});}
+function rebuild(fit=false){
+ dispose(model);parts.forEach((part,i)=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(part.vertices.flat(),3));g.setIndex(part.triangles.flat());g.setAttribute('color',new THREE.Float32BufferAttribute((part.colors||part.vertices.map(()=>[.48,.63,.85])).flat(),3));g.computeVertexNormals();const material=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.82,metalness:0,flatShading:true,side:THREE.DoubleSide});const mesh=new THREE.Mesh(g,material);mesh.userData.part=i;model.add(mesh);});
+ if(parts.length){bounds.setFromObject(model);const size=bounds.getSize(new THREE.Vector3()).length();if(grid){scene.remove(grid);grid.geometry.dispose();grid.material.dispose();}grid=new THREE.GridHelper(Math.max(1,size*1.5),30,0x4e6385,0x2b3b54);grid.rotation.x=Math.PI/2;grid.position.z=bounds.min.z-.02;scene.add(grid);}
+ updateClip();updateHighlight();updateUI();drawAreas();if(fit)fitView();
+}
+function fitView(direction=new THREE.Vector3(.9,-1.2,.9),point=bounds.getCenter(new THREE.Vector3())){const radius=Math.max(.1,bounds.getSize(new THREE.Vector3()).length()/2),angle=Math.min(camera.fov*Math.PI/360,Math.atan(Math.tan(camera.fov*Math.PI/360)*camera.aspect)),distance=radius/Math.sin(angle)*1.15;controls.target.copy(point);camera.position.copy(point).addScaledVector(direction.clone().normalize(),distance);camera.far=Math.max(10000,distance*8);camera.updateProjectionMatrix();controls.update();}
+function updateClip(){const axis=$('section-axis').value,t=Number($('section-position').value)/100,value=bounds.min[axis]+(bounds.max[axis]-bounds.min[axis])*t;clip.normal.set(0,0,0);clip.normal[axis]=-flip;clip.constant=value*flip;for(const mesh of model.children){mesh.material.clippingPlanes=$('section-enabled').checked?[clip]:[];mesh.material.needsUpdate=true;}}
+function snapshot(){history.push({parts,selected:[...selected]});if(history.length>12)history.shift();future=[];}
+function clearReference(){reference=null;areas=[];$('reference-info').textContent='Referans yüzey seçilmedi.';drawAreas();}
+function setTool(value){tool=value;controls.enabled=value==='orbit';for(const key of ['orbit','reference','box','circle'])$('tool-'+key).classList.toggle('active',key===value);renderer.domElement.style.cursor=value==='orbit'?'grab':'crosshair';}
+function rayAt(e){const r=renderer.domElement.getBoundingClientRect(),ray=new THREE.Raycaster();ray.setFromCamera(new THREE.Vector2((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1),camera);return ray;}
+function hit(e){return rayAt(e).intersectObjects(model.children).find(h=>!$('section-enabled').checked||clip.distanceToPoint(h.point)>=-1e-5);}
+function onPlane(e){if(!reference)return null;return rayAt(e).ray.intersectPlane(new THREE.Plane().setFromNormalAndCoplanarPoint(reference.n,reference.origin),new THREE.Vector3());}
+function baseArea(center,width,height,shape){return {center:center.toArray(),width,height,shape,u:reference.u.toArray(),v:reference.v.toArray(),n:reference.n.toArray()};}
+function drawAreas(temporary){dispose(previews);if(arrow){scene.remove(arrow);arrow.dispose();arrow=null;}if(!reference)return;
+ const radius=Math.max(.5,bounds.getSize(new THREE.Vector3()).length()*.06);arrow=new THREE.ArrowHelper(reference.n,reference.origin,radius,0x93c3ff,radius*.3,radius*.12);scene.add(arrow);
+ const depth=Math.max(.01,Number($('edit-depth').value)||2),offset=Number($('edit-offset').value)||0;
+ for(const area of [...areas,...(temporary?[temporary]:[])]){const g=area.shape==='circle'?new THREE.CylinderGeometry(area.width/2,area.width/2,depth,64).rotateX(Math.PI/2):new THREE.BoxGeometry(area.width,area.height,depth),m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({color:0xffa45a,transparent:true,opacity:.24,depthWrite:false,side:THREE.DoubleSide}));
+ const u=new THREE.Vector3(...area.u),v=new THREE.Vector3(...area.v),n=new THREE.Vector3(...area.n);m.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(u,v,n));m.position.fromArray(area.center).addScaledVector(n,offset+depth/2);previews.add(m);}
+}
+renderer.domElement.addEventListener('pointerdown',e=>{if(e.button!==0||busy)return;const point=tool==='box'?onPlane(e):null;drag={x:e.clientX,y:e.clientY,point};if(tool!=='orbit')renderer.domElement.setPointerCapture(e.pointerId);});
+renderer.domElement.addEventListener('pointermove',e=>{if(tool==='box'&&drag?.point&&reference){const p=onPlane(e);if(p){const d=p.clone().sub(drag.point);drawAreas(baseArea(p.clone().add(drag.point).multiplyScalar(.5),Math.abs(d.dot(reference.u)),Math.abs(d.dot(reference.v)),'box'));}}});
+renderer.domElement.addEventListener('pointerup',e=>{if(!drag||busy)return;const start=drag;drag=null;if(e.button!==0)return;
+ if(tool==='box'&&start.point){const p=onPlane(e);if(!p)return;const d=p.clone().sub(start.point),w=Math.abs(d.dot(reference.u)),h=Math.abs(d.dot(reference.v));if(w>.01&&h>.01){areas.push(baseArea(p.clone().add(start.point).multiplyScalar(.5),w,h,'box'));drawAreas();updateUI();status('Alan seçildi. Çıkıntıyı düzle veya çukuru doldur işlemini uygulayın.');}return;}
+ if(Math.hypot(e.clientX-start.x,e.clientY-start.y)>5)return;
+ if(tool==='circle'&&reference){const p=onPlane(e),diameter=Number($('brush-diameter').value);if(p&&diameter>0){areas.push(baseArea(p,diameter,diameter,'circle'));drawAreas();updateUI();}return;}
+ const picked=hit(e);if(!picked)return;const id=picked.object.userData.part;
+ if(tool==='reference'){const n=picked.face.normal.clone().normalize(),u=new THREE.Vector3().crossVectors(Math.abs(n.z)<.9?new THREE.Vector3(0,0,1):new THREE.Vector3(0,1,0),n).normalize(),v=new THREE.Vector3().crossVectors(n,u).normalize();reference={part:id,origin:picked.point.clone(),n,u,v};selected=new Set([id]);areas=[];$('reference-info').textContent='Referans hazır · '+(parts[id].name||`Parça ${id+1}`);setTool('box');drawAreas();status('Yazının etrafına alan çizin. Gerekirse önce “Yüzeye bak” düğmesini kullanın.');}
+ else{if(e.ctrlKey||e.metaKey){selected.has(id)?selected.delete(id):selected.add(id);}else selected=new Set([id]);if(reference&&reference.part!==id)clearReference();}updateHighlight();updateUI();
+});
+
+function packMeshes(nodes,name,scale=1){
+ const vertices=[],colors=[],triangles=[];
+ for(const node of nodes){const g=node.geometry,p=g.getAttribute('position'),c=g.getAttribute('color'),index=g.index,offset=vertices.length,mat=Array.isArray(node.material)?node.material[0]:node.material,base=mat?.color||new THREE.Color(.48,.63,.85),point=new THREE.Vector3();
+  for(let i=0;i<p.count;i++){point.fromBufferAttribute(p,i).applyMatrix4(node.matrixWorld).multiplyScalar(scale);vertices.push(point.toArray());colors.push(c?[c.getX(i)*base.r,c.getY(i)*base.g,c.getZ(i)*base.b]:base.toArray());}
+  const count=index?index.count:p.count;for(let i=0;i<count;i+=3)triangles.push([0,1,2].map(j=>offset+(index?index.getX(i+j):i+j)));
+ }
+ return {name,vertices,colors,triangles};
+}
+async function loadFile(file){if(!file||busy)return;busy=true;updateUI();try{if(file.size>100*1024*1024)throw new Error('Model en fazla 100 MB olabilir.');status('Model okunuyor…');const ext=file.name.split('.').at(-1).toLowerCase(),buffer=await file.arrayBuffer();let group,scale=1;
+ if(ext==='stl'){const g=new STLLoader().parse(buffer);group=new THREE.Group();group.add(new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0xb7ccec})));}
+ else if(ext==='obj')group=new OBJLoader().parse(new TextDecoder().decode(buffer));
+ else if(ext==='3mf'){group=new ThreeMFLoader().parse(buffer);const files=unzipSync(new Uint8Array(buffer)),main=Object.keys(files).find(k=>/^3d\/3dmodel\.model$/i.test(k))||Object.keys(files).find(k=>/\.model$/i.test(k)),unit=main?new DOMParser().parseFromString(strFromU8(files[main]),'application/xml').documentElement.getAttribute('unit'):null;scale=({micron:.001,millimeter:1,centimeter:10,inch:25.4,foot:304.8,meter:1000})[unit||'millimeter']||1;}
+ else throw new Error('STL, 3MF veya OBJ dosyası seçin.');
+ group.updateMatrixWorld(true);const loaded=[];group.traverse(node=>{const children=node.children.filter(c=>c.isMesh);if(children.length)loaded.push(packMeshes(children,node.name||`Parça ${loaded.length+1}`,scale));});
+ if(!loaded.length)throw new Error('Dosyada üçgen yüzey bulunamadı.');const count=loaded.reduce((s,p)=>s+p.triangles.length,0);if(count>1500000)throw new Error('Bu model 1,5 milyon üçgenden büyük. Önce ağı sadeleştirin.');if(loaded.some(p=>p.vertices.some(v=>v.some(x=>!Number.isFinite(x)))))throw new Error('Dosyada geçersiz koordinat var.');
+ parts=loaded;sourceName=file.name.replace(/\.[^.]+$/,'');selected=new Set([0]);history=[];future=[];clearReference();$('model-name').textContent=file.name;setTool('orbit');rebuild(true);status('Model hazır. Yazının yanından referans yüzey seçerek başlayın.');group.traverse(n=>{if(n.isMesh){n.geometry.dispose();for(const m of Array.isArray(n.material)?n.material:[n.material])m.dispose();}});
+ }catch(e){fail(e);}finally{busy=false;$('model-file').value='';updateUI();}}
+function operation(data){return new Promise((resolve,reject)=>{if(!worker){worker=new Worker(new URL('mesh-worker.js',document.baseURI),{type:'module'});worker.onmessage=({data})=>{if(!request)return;clearTimeout(request.timer);const {resolve,reject}=request;request=null;data.error?reject(new Error(data.error)):resolve(data.parts);};worker.onerror=e=>{if(request){clearTimeout(request.timer);request.reject(new Error(e.message||'Geometri motoru açılamadı.'));request=null;}worker.terminate();worker=null;};}request={resolve,reject,timer:setTimeout(()=>cancelOperation('İşlem zaman aşımına uğradı. Daha küçük bir alan deneyin.'),120000)};worker.postMessage(data);});}
+function cancelOperation(message='İşlem iptal edildi. Model değiştirilmedi.'){if(request){clearTimeout(request.timer);request.reject(new Error(message));request=null;}worker?.terminate();worker=null;}
+async function applyOperation(mode){if(busy||!parts.length)return;const index=mode==='split'?[...selected][0]:reference?.part;if(index===undefined)return;if(mode!=='split'&&!areas.length)return;
+ const depth=Number($('edit-depth').value),offset=Number($('edit-offset').value);if(mode!=='split'&&(!Number.isFinite(depth)||depth<=0||depth>1000||!Number.isFinite(offset)))return status('Geçerli derinlik ve ofset girin.');
+ busy=true;updateUI();status('Kapalı katı üzerinde yerel işlem yapılıyor…');try{const result=await operation({mode,part:parts[index],areas:areas.map(a=>({...a,depth,offset}))});snapshot();parts=[...parts.slice(0,index),...result,...parts.slice(index+1)];selected=new Set(result.map((_,i)=>index+i));clearReference();setTool('orbit');rebuild();status(mode==='split'?`${result.length} bağlantısız parça bulundu.`:'İşlem tamamlandı. Yalnızca seçilen yerel alan değiştirildi.');}catch(e){fail(e);}finally{busy=false;updateUI();}}
+function undo(redo=false){if(busy)return;const from=redo?future:history,to=redo?history:future;if(!from.length)return;to.push({parts,selected:[...selected]});const state=from.pop();parts=state.parts;selected=new Set(state.selected);clearReference();setTool('orbit');rebuild();status(redo?'İşlem yinelendi.':'İşlem geri alındı.');}
+function exportModel(){if(!parts.length)return status('Önce bir 3D dosyası açın.');if(busy)return;try{const type=$('mesh-format').value,packed=parts.map(serialPart),data=type==='stl'?exportSTL(packed):type==='obj'?exportOBJ(packed):export3MF(packed),extension=type==='obj'?'zip':type,url=URL.createObjectURL(new Blob([data],{type:type==='3mf'?'model/3mf':type==='stl'?'model/stl':'application/zip'})),a=document.createElement('a');a.href=url;a.download=sourceName.replace(/[<>:"/\\|?*]/g,'_')+'-duzenlendi.'+extension;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);status('Düzenlenen model kaydediliyor. Kaynak dosya korunuyor.');}catch(e){fail(e);}}
+$('model-open').onclick=()=>$('model-file').click();$('model-file').onchange=e=>loadFile(e.target.files[0]);
+viewport.ondragover=e=>e.preventDefault();viewport.ondrop=e=>{e.preventDefault();loadFile(e.dataTransfer.files[0]);};
+for(const value of ['orbit','reference','box','circle'])$('tool-'+value).onclick=()=>{setTool(value);if(value==='reference')status('Yazıya değil, yanındaki temiz yüzeye tıklayın.');};
+$('reference-view').onclick=()=>{if(reference)fitView(reference.n,reference.origin);};$('reference-flip').onclick=()=>{if(reference){reference.n.negate();reference.v.negate();areas=[];drawAreas();updateUI();}};
+$('model-fit').onclick=()=>fitView();$('view-front').onclick=()=>fitView(new THREE.Vector3(0,-1,0));$('view-top-model').onclick=()=>fitView(new THREE.Vector3(0,-.0001,1));
+for(const id of ['section-enabled','section-axis','section-position'])$(id).oninput=updateClip;$('section-flip').onclick=()=>{flip*=-1;updateClip();};
+for(const id of ['edit-depth','edit-offset'])$(id).oninput=()=>drawAreas();$('areas-clear').onclick=()=>{areas=[];drawAreas();updateUI();};
+$('erase-local').onclick=()=>applyOperation('erase');$('fill-local').onclick=()=>applyOperation('fill');$('split-parts').onclick=()=>applyOperation('split');$('cancel-operation').onclick=()=>cancelOperation();
+$('delete-parts').onclick=()=>{if(busy||!selected.size)return;snapshot();parts=parts.filter((_,i)=>!selected.has(i));selected.clear();clearReference();rebuild();status('Seçili parçalar silindi. Geri al ile geri getirebilirsiniz.');};
+$('mesh-undo').onclick=()=>undo();$('mesh-redo').onclick=()=>undo(true);$('mesh-export').onclick=exportModel;
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&['s','o','e'].includes(e.key.toLowerCase())&&!parent.katmanDesktop){e.preventDefault();if(e.key.toLowerCase()==='o')$('model-file').click();else exportModel();return;}if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undo(e.shiftKey);}if(e.key==='Escape'){areas=[];drawAreas();setTool('orbit');updateUI();}});
+window.addEventListener('message',e=>{if(e.source!==parent||e.origin!==location.origin||e.data?.type!=='katman-editor-action')return;const a=e.data.action;if(a==='image'||a==='open')$('model-file').click();else if(a==='save'||a==='export')exportModel();else if(a==='help')document.querySelector('details').open=true;});
+new ResizeObserver(()=>{const w=viewport.clientWidth,h=viewport.clientHeight;if(!w||!h)return;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h);}).observe(viewport);
+function animate(){requestAnimationFrame(animate);if(document.hidden||!viewport.clientWidth||!viewport.clientHeight)return;controls.update();renderer.render(scene,camera);}animate();fitView();updateUI();

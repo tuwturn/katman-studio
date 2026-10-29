@@ -6,7 +6,7 @@ import os from 'node:os';
 import {spawn} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 const root = path.resolve(fileURLToPath(new URL('./public/', import.meta.url)));
-const types = {'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.ico':'image/x-icon','.txt':'text/plain; charset=utf-8'};
+const types = {'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.wasm':'application/wasm','.png':'image/png','.ico':'image/x-icon','.txt':'text/plain; charset=utf-8'};
 export function networkAddresses(interfaces=os.networkInterfaces()){
   const candidates=Object.entries(interfaces).flatMap(([name,addresses])=>(addresses||[]).filter(a=>a&&!a.internal&&(a.family==='IPv4'||a.family===4)&&!a.address.startsWith('169.254.')).map(a=>({address:a.address,score:Number(/^(192\.168\.|10\.)/.test(a.address))*2-Number(/virtual|vmware|vbox|vethernet|wsl|docker|tailscale|zerotier/i.test(name)||/^0[8a]:00:27:/i.test(a.mac||''))*10})));
   return [...new Set(candidates.sort((a,b)=>b.score-a.score).map(a=>a.address))];

@@ -35,6 +35,12 @@ jobs:
         run: npm run test:desktop
         env:
           KATMAN_EXECUTABLE: ${{ github.workspace }}/dist/${{ matrix.output }}/Katman Studio.app/Contents/MacOS/Katman Studio
+      - name: Test local 3D editing on macOS
+        run: node tests/mesh-editor-ui.mjs
+        env:
+          KATMAN_NATIVE: '1'
+          PLAYWRIGHT_PATH: playwright
+          KATMAN_EXECUTABLE: ${{ github.workspace }}/dist/${{ matrix.output }}/Katman Studio.app/Contents/MacOS/Katman Studio
       - uses: actions/upload-artifact@v4
         with:
           name: Katman-Studio-mac-${{ matrix.arch }}

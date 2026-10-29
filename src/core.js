@@ -168,10 +168,11 @@ export function buildParts(project) {
 const escapeXML=s=>String(s).replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'}[c]));
 const num=n=>Number(n.toFixed(6));
 export function export3MF(parts) {
-  const colors=[...new Set(parts.map(p=>p.color))];
+  const colors=[...new Set(parts.flatMap(p=>[p.color,...(p.vertexColors||[])]))];
+  const colorIndex=new Map(colors.map((c,i)=>[c,i]));
   // Core base materials preserve named printable parts; the materials extension
   // additionally records explicit color design intent on every triangle.
-  const objects=parts.map((p,i)=>`<object id="${i+3}" type="model" name="${escapeXML(p.name)}" pid="1" pindex="${colors.indexOf(p.color)}"><mesh><vertices>${p.vertices.map(v=>`<vertex x="${num(v[0])}" y="${num(v[1])}" z="${num(v[2])}"/>`).join('')}</vertices><triangles>${p.triangles.map(t=>`<triangle v1="${t[0]}" v2="${t[1]}" v3="${t[2]}" pid="2" p1="${colors.indexOf(p.color)}"/>`).join('')}</triangles></mesh></object>`).join('');
+  const objects=parts.map((p,i)=>`<object id="${i+3}" type="model" name="${escapeXML(p.name)}" pid="1" pindex="${colorIndex.get(p.color)}"><mesh><vertices>${p.vertices.map(v=>`<vertex x="${num(v[0])}" y="${num(v[1])}" z="${num(v[2])}"/>`).join('')}</vertices><triangles>${p.triangles.map(t=>`<triangle v1="${t[0]}" v2="${t[1]}" v3="${t[2]}" pid="2" p1="${colorIndex.get(p.vertexColors?.[t[0]]||p.color)}" p2="${colorIndex.get(p.vertexColors?.[t[1]]||p.color)}" p3="${colorIndex.get(p.vertexColors?.[t[2]]||p.color)}"/>`).join('')}</triangles></mesh></object>`).join('');
   const assembly=parts.length+3;
   const xml=`<?xml version="1.0" encoding="UTF-8"?><model unit="millimeter" xml:lang="tr-TR" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" xmlns:m="http://schemas.microsoft.com/3dmanufacturing/material/2015/02"><metadata name="Application">Katman</metadata><resources><basematerials id="1">${colors.map((c,i)=>`<base name="Renk ${i+1} ${c}" displaycolor="${c}FF"/>`).join('')}</basematerials><m:colorgroup id="2">${colors.map(c=>`<m:color color="${c}FF"/>`).join('')}</m:colorgroup>${objects}<object id="${assembly}" type="model" name="Katman model"><components>${parts.map((_,i)=>`<component objectid="${i+3}"/>`).join('')}</components></object></resources><build><item objectid="${assembly}"/></build></model>`;
   return zipSync({
@@ -221,7 +222,7 @@ export function buildSTLSurface(project) {
 }
 export function exportOBJ(parts) {
   let obj='# Katman — units: millimeters\nmtllib model.mtl\n',offset=1,mtl='';
-  parts.forEach((p,i)=>{obj+=`o part_${i}\nusemtl color_${i}\n`;obj+=p.vertices.map(v=>`v ${v.map(num).join(' ')}\n`).join('');obj+=p.triangles.map(t=>`f ${t.map(v=>v+offset).join(' ')}\n`).join('');offset+=p.vertices.length;const rgb=p.color.match(/\w\w/g).map(s=>parseInt(s,16)/255);mtl+=`newmtl color_${i}\nKd ${rgb.join(' ')}\nd 1\n\n`;});
+  parts.forEach((p,i)=>{obj+=`o part_${i}\nusemtl color_${i}\n`;obj+=p.vertices.map((v,k)=>`v ${v.map(num).join(' ')}${p.vertexColors?.[k]?' '+p.vertexColors[k].match(/\w\w/g).map(x=>num(parseInt(x,16)/255)).join(' '):''}\n`).join('');obj+=p.triangles.map(t=>`f ${t.map(v=>v+offset).join(' ')}\n`).join('');offset+=p.vertices.length;const rgb=p.vertexColors?[1,1,1]:p.color.match(/\w\w/g).map(s=>parseInt(s,16)/255);mtl+=`newmtl color_${i}\nKd ${rgb.join(' ')}\nd 1\n\n`;});
   return zipSync({'model.obj':strToU8(obj),'model.mtl':strToU8(mtl)});
 }
 export function exportSVG(project) {
