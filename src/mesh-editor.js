@@ -8,7 +8,8 @@ import {export3MF,exportSTL,exportOBJ} from './core.js';
 
 const $=id=>document.getElementById(id),viewport=$('model-viewport');
 let parts=[],selected=new Set(),reference=null,areas=[],history=[],future=[],sourceName='duzenlenen-model',tool='orbit',busy=false,worker,request,drag=null,flip=1;
-const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(38,1,.01,100000),renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,logarithmicDepthBuffer:true});
+const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(38,1,.01,100000),renderer=createRenderer();
+function createRenderer(){try{return new THREE.WebGLRenderer({antialias:true,alpha:true,logarithmicDepthBuffer:true});}catch(e){$('model-status').textContent='3D görünümü başlatılamadı. Donanım hızlandırmasını ve ekran kartı sürücüsünü kontrol edin.';throw e;}}
 camera.up.set(0,0,1);renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.localClippingEnabled=true;renderer.setClearColor(0,0);viewport.append(renderer.domElement);
 const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.minDistance=.05;controls.maxDistance=100000; // full orbit, including interior undersides
 const model=new THREE.Group(),previews=new THREE.Group();scene.add(model,previews,new THREE.AmbientLight(0xffffff,1.8));const light=new THREE.DirectionalLight(0xffffff,2.4);light.position.set(60,-80,150);scene.add(light);const fill=new THREE.DirectionalLight(0xb6ceff,1);fill.position.set(-60,80,-50);scene.add(fill);
@@ -67,12 +68,12 @@ function packMeshes(nodes,name,scale=1){
  const vertices=[],colors=[],triangles=[];
  for(const node of nodes){const g=node.geometry,p=g.getAttribute('position'),c=g.getAttribute('color'),index=g.index,offset=vertices.length,mat=Array.isArray(node.material)?node.material[0]:node.material,base=mat?.color||new THREE.Color(.48,.63,.85),point=new THREE.Vector3();
   for(let i=0;i<p.count;i++){point.fromBufferAttribute(p,i).applyMatrix4(node.matrixWorld).multiplyScalar(scale);vertices.push(point.toArray());colors.push(c?[c.getX(i)*base.r,c.getY(i)*base.g,c.getZ(i)*base.b]:base.toArray());}
-  const count=index?index.count:p.count;for(let i=0;i<count;i+=3)triangles.push([0,1,2].map(j=>offset+(index?index.getX(i+j):i+j)));
+  const count=index?index.count:p.count,order=node.matrixWorld.determinant()<0?[2,1,0]:[0,1,2];for(let i=0;i<count;i+=3)triangles.push(order.map(j=>offset+(index?index.getX(i+j):i+j)));
  }
  return {name,vertices,colors,triangles};
 }
 async function loadFile(file){if(!file||busy)return;busy=true;updateUI();try{if(file.size>100*1024*1024)throw new Error('Model en fazla 100 MB olabilir.');status('Model okunuyor…');const ext=file.name.split('.').at(-1).toLowerCase(),buffer=await file.arrayBuffer();let group,scale=1;
- if(ext==='stl'){const g=new STLLoader().parse(buffer);group=new THREE.Group();group.add(new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0xb7ccec})));}
+ if(ext==='stl'){const g=new STLLoader().parse(buffer);group=new THREE.Group();group.add(new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:g.getAttribute('color')?0xffffff:0xb7ccec})));}
  else if(ext==='obj')group=new OBJLoader().parse(new TextDecoder().decode(buffer));
  else if(ext==='3mf'){group=new ThreeMFLoader().parse(buffer);const files=unzipSync(new Uint8Array(buffer)),main=Object.keys(files).find(k=>/^3d\/3dmodel\.model$/i.test(k))||Object.keys(files).find(k=>/\.model$/i.test(k)),unit=main?new DOMParser().parseFromString(strFromU8(files[main]),'application/xml').documentElement.getAttribute('unit'):null;scale=({micron:.001,millimeter:1,centimeter:10,inch:25.4,foot:304.8,meter:1000})[unit||'millimeter']||1;}
  else throw new Error('STL, 3MF veya OBJ dosyası seçin.');
