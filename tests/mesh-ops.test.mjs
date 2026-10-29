@@ -26,3 +26,9 @@ test('a circular edit leaves nearby unselected raised text intact',()=>{
  const base=M.cube([30,20,4],true),a=M.cube([2,2,1]).translate([-1,-1,2]),b=M.cube([2,2,1]).translate([9,-1,2]),one=base.add(a),source=one.add(b),part=fromSolid(source),result=editPart(wasm,part,[{...area,shape:'circle'}],'erase'),solid=toSolid(wasm,result);
  assert.ok(Math.abs(solid.volume()-(base.volume()+b.volume()))<1e-5);assert.equal(solid.status(),'NoError');[base,a,b,one,source,solid].forEach(p=>p.delete());
 });
+test('full-depth area cut is bounded to its footprint and can remove a whole isolated part',()=>{
+ const base=M.cube([10,10,4],true),part=fromSolid(base),result=editPart(wasm,part,[{...area,width:2,height:3}],'cut'),actual=toSolid(wasm,result);
+ assert.ok(Math.abs(actual.volume()-376)<1e-5);assert.equal(actual.status(),'NoError');
+ assert.equal(editPart(wasm,part,[{...area,width:30,height:30}],'cut'),null);
+ [base,actual].forEach(p=>p.delete());
+});

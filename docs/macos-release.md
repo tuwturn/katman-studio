@@ -1,3 +1,5 @@
+3.1 düzeltmeleri: modelin altına yerleşen ızgara, bütün araçlarda kaydırma/zoom, referans modunda döndürme, doğrudan kutu seçimi, geri alınabilir zemine ortalama ve sınırlı alanı tamamen kesme.
+
 Mac sürümü: macOS 13 Ventura ve sonrası.
 
 3.0 sürümünde ayrı **3D model düzenle** alanı eklendi: STL / 3MF / OBJ açma, iç yüzeylere kesit görünümüyle ulaşma, referans yüzey ve yerel alanla kabartma yazıyı düzleme, çukur yazıyı doldurma, bağlantısız harfleri ayırıp silme ve geri alma. Bu araç eğri yüzeyi otomatik tahmin etmez; seçilen alanı yerel bir düzleme getirir.

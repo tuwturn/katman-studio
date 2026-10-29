@@ -1,4 +1,4 @@
-# Katman Studio 3.0 — Otomatik görselden vektör ve 3D
+# Katman Studio 3.1 — Otomatik görselden vektör ve 3D
 
 Uygulama boş açılır. Görseli ekleyin; renk ayrımı, düzgün vektör eğrileri ve ayrıntı kalitesi otomatik hazırlanır. Piksel çözünürlüğü, kenar filtresi, gölge veya Z büyütme ayarı yapmanız gerekmez.
 
@@ -8,13 +8,16 @@ Uygulama boş açılır. Görseli ekleyin; renk ayrımı, düzgün vektör eğri
 
 ## 3D model düzenleme
 
-Üstteki **3D model düzenle** sekmesi ayrı bir çalışma alanıdır; görselden kabartma çalışması sekmeler arasında korunur. STL, 3MF ve OBJ dosyası açılabilir; çıktı STL, renkli 3MF veya OBJ + MTL ZIP olarak kaydedilir. Dosya kaynakta değiştirilmez. Modelin konumu ve mm ölçüleri korunur; 3MF birimleri mm’ye dönüştürülür. STL/OBJ birimsiz olduğundan mm kabul edilir. Dosya sınırı 100 MB / 1,5 milyon üçgendir. Harici OBJ MTL/doku dosyaları içeri alınmaz.
+Üstteki **3D model düzenle** sekmesi ayrı bir çalışma alanıdır; görselden kabartma çalışması sekmeler arasında korunur. STL, 3MF ve OBJ dosyası açılabilir; çıktı STL, renkli 3MF veya OBJ + MTL ZIP olarak kaydedilir. Dosya kaynakta değiştirilmez. Modelin konumu ve mm ölçüleri korunur; ızgara modelin altına yerleşir. **Modeli zemine ortala** düğmesi istenirse modeli XY merkezine ve Z=0 zeminine taşır; bu işlem kamera konumuyla birlikte geri alınabilir; 3MF birimleri mm’ye dönüştürülür. STL/OBJ birimsiz olduğundan mm kabul edilir. Dosya sınırı 100 MB / 1,5 milyon üçgendir. Harici OBJ MTL/doku dosyaları içeri alınmaz.
 
 1. Gerekirse sağdan **Kesit görünümü** ile ön yüzeyleri gizleyin ve iç kısma ulaşın. Bu sadece görüntüdür; dışa aktarılan model kesilmez.
 2. **Düz yüzeyden referans seç** ile yazının yanındaki temiz zemine / iç duvara tıklayın. **Yüzeye bak** görünümü bu yüzeye çevirir. Mavi ok işlem yönünü gösterir.
-3. **Dikdörtgen alan çiz** ile yazının etrafına kutu çizin veya daireyle birden fazla alan işaretleyin. Alanı yalnızca kaldırılacak yazıyla sınırlayın.
+3. **Dikdörtgen alan çiz** ile yazının etrafına kutu çizin (temiz yüzeyden başlarsanız referans otomatik alınır. Boşluktan da başlayıp doğrudan tam kesim alanı seçebilirsiniz; bu durumda düzleme için ayrıca temiz yüzey referansı gerekir) veya daireyle birden fazla alan işaretleyin. Alanı yalnızca kaldırılacak yazıyla sınırlayın.
 4. Derinliği yazıyı kapsayacak şekilde ayarlayıp **Çıkıntılı yazıyı düzle** veya **Çukur yazıyı doldur** seçin. Ofset 0, referans yüzey seviyesidir. Yön yanlışsa ters çevrilebilir. İşlem seçilen parçada, seçilen alan ve derinlikle sınırlıdır; sonsuz bir düzlemle bütün gövde kesilmez.
-5. Ayrı duran yazı/harfler için **Bağlantısız parçaları ayır**, sonra parçayı seçip **Seçili parçaları sil** kullanılabilir. Gövdeye kaynaşmış yazı için yerel düzleme kullanılır. Ctrl / ⌘ ile çoklu parça seçilebilir.
+5. Sarkıtılmış yazı veya bölümü kalınlığı boyunca kaldırmak için **Seçili alanı tamamen kes** kullanılır. Bu işlem sadece kutu/daire ayak izini kaldırır; bütün modeli düzlemle kesmez.
+6. Ayrı duran yazı/harfler için **Bağlantısız parçaları ayır**, sonra parçayı seçip **Seçili parçaları sil** kullanılabilir. Gövdeye kaynaşmış yazı için yerel düzleme kullanılır. Ctrl / ⌘ ile çoklu parça seçilebilir.
+
+Referans modunda sol sürükleme modeli döndürür. Sağ sürükleme ve tekerlek bütün seçim araçlarında açık kalır. **Görünümü kaydır** modunda sol sürükleme de kaydırır. **Görünüme sığdır** kamerayı modele getirir.
 
 **Geri al / Yinele** son 12 işlemi tutar. Uzun geometri işlemleri iptal edilebilir; iptal edilen işlem modele uygulanmaz. Düzenleme motoru tarayıcıdaki WebAssembly worker içinde çalışır; model sunucuya yüklenmez ve internet gerekmez.
 

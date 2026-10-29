@@ -24,9 +24,9 @@ export function localCutter(wasm,area,mode,color=[.48,.63,.85]){
 export function editPart(wasm,part,areas,mode){
  let result=toSolid(wasm,part);
  try{
-  for(const area of areas){const cutter=localCutter(wasm,area,mode,part.colors?.[0]),next=mode==='fill'?result.add(cutter):result.subtract(cutter);cutter.delete();result.delete();result=next;}
+  for(const area of areas){let volume=area;if(mode==='cut'){let lo=Infinity,hi=-Infinity;for(const p of part.vertices){const projection=p.reduce((s,x,i)=>s+(x-area.center[i])*area.n[i],0);lo=Math.min(lo,projection);hi=Math.max(hi,projection);}const margin=Math.max(.01,(hi-lo)*.00001);volume={...area,offset:lo-margin,depth:hi-lo+margin*2};}const cutter=localCutter(wasm,volume,mode,part.colors?.[0]),next=mode==='fill'?result.add(cutter):result.subtract(cutter);cutter.delete();result.delete();result=next;}
   if(result.status()!=='NoError')throw new Error('Katı işlemi tamamlanamadı: '+result.status());
-  if(result.isEmpty())throw new Error('Seçilen alan modelin tamamını kaldırıyor. Alanı veya derinliği küçültün.');
+  if(result.isEmpty()){if(mode==='cut')return null;throw new Error('Seçilen alan modelin tamamını kaldırıyor. Alanı veya derinliği küçültün.');}
   return fromSolid(result,part);
  }finally{result.delete();}
 }
