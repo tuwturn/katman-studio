@@ -1,4 +1,4 @@
-# Katman Studio 3.3 — Otomatik görselden vektör ve 3D
+# Katman Studio 3.4 — Otomatik görselden vektör ve 3D
 
 Uygulama boş açılır. Görseli ekleyin; renk ayrımı, düzgün vektör eğrileri ve ayrıntı kalitesi otomatik hazırlanır. Piksel çözünürlüğü, kenar filtresi, gölge veya Z büyütme ayarı yapmanız gerekmez.
 
@@ -117,3 +117,9 @@ Gerçek Gallardo dosyasıyla regresyon: `TEST_MODEL` ortam değişkenini kaynak 
 ## 3.3 — Noktalarla seçim
 
 İçbükey çokgen sınırları desteklenir; kesim çokgenin gerçek içinden yapılır. Çizgileri kesişen seçimler uygulanmaz. Taralı önizleme ve sınır noktaları görünür; Enter / ilk noktaya tıklama seçimi kapatır, Backspace son noktayı geri alır. Tekerleğe basılı sürükleme kaydırır; sağ sürükleme döndürür.
+
+## 3.4 — Alan doldurma ve aynı düzlemde yüzey çizme
+
+Sağdaki **Alan doldur / yüzey çiz** paneli noktalarla çizilen kapalı alana malzeme ekler. **Dolgu düzlemini yüzeyden al** ile mevcut yüzeye tıklayın; seçilmiş alan korunarak bu düzleme izdüşürülür. Üst yüzey aynı düzlemde olur; istenirse referansa göre yükseklik farkı girilir. **Z yüksekliği gir** seçeneğinde üst yüzeyin mutlak Z koordinatı belirlenir. Dolgunun altı modelin ilgili yöndeki alt sınırına kadar uzanır veya kullanıcı tarafından girilen kalınlık kullanılır. **Dolgu hacmini önizle** eklenecek hacmi gösterir. **Seçili alanı doldur** gerçek geometriye ekler; geri alma ve tüm çıktı biçimleri desteklenir. Eğri yüzeyin devamı otomatik tahmin edilmez; referans bir düzlemdir.
+
+`node tests/mesh-fill-ui.mjs` arayüzden yüzey referansı alırken seçimin korunmasını, aynı düzleme doldurmayı, sayısal Z yüksekliğini, önizlemeyi ve STL çıktısındaki hacmi doğrular. `KATMAN_NATIVE=1` ile paketlenmiş EXE üzerinde çalışır.
