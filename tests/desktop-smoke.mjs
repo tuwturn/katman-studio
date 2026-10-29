@@ -11,7 +11,7 @@ await mkdir('test-results',{recursive:true});
 const electronApp=await _electron.launch({executablePath,env:{...process.env,KATMAN_TEST:'1'},args:['--enable-unsafe-swiftshader']});
 try{
  const page=await electronApp.firstWindow(),errors=[];page.setDefaultTimeout(30000);page.on('pageerror',e=>errors.push(e.message));
- await page.locator('#empty-state').waitFor();assert.equal(await page.locator('.layer,#demo').count(),0);assert.equal(await page.locator('#region-count').textContent(),'0');assert.equal(await page.locator('#export').isDisabled(),true);
+ await page.waitForLoadState('load');await page.locator('#empty-state').waitFor();assert.equal(await page.locator('.layer,#demo').count(),0);assert.equal(await page.locator('#region-count').textContent(),'0');assert.equal(await page.locator('#export').isDisabled(),true);
  assert.match(page.url(),/^katman:\/\/app\//);assert.equal(await page.evaluate(()=>typeof window.require),'undefined');
  await page.locator('#file').setInputFiles('tests/fixture.svg');await page.waitForFunction(()=>document.querySelector('#model-name').textContent==='fixture'&&!document.querySelector('#vectorize').disabled);
  assert.equal(await page.locator('.height-explainer,#height-slider,.height-presets,[data-height]').count(),0);assert.equal(await page.locator('#selection-height').getAttribute('max'),'250');
