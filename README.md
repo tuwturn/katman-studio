@@ -1,4 +1,4 @@
-# Katman Studio 3.1 — Otomatik görselden vektör ve 3D
+# Katman Studio 3.2 — Otomatik görselden vektör ve 3D
 
 Uygulama boş açılır. Görseli ekleyin; renk ayrımı, düzgün vektör eğrileri ve ayrıntı kalitesi otomatik hazırlanır. Piksel çözünürlüğü, kenar filtresi, gölge veya Z büyütme ayarı yapmanız gerekmez.
 
@@ -21,7 +21,7 @@ Referans modunda sol sürükleme modeli döndürür. Sağ sürükleme ve tekerle
 
 **Geri al / Yinele** son 12 işlemi tutar. Uzun geometri işlemleri iptal edilebilir; iptal edilen işlem modele uygulanmaz. Düzenleme motoru tarayıcıdaki WebAssembly worker içinde çalışır; model sunucuya yüklenmez ve internet gerekmez.
 
-Araç seçilen yüzeyi **yerel bir düzleme** getirir. Eğri yüzeyin devamını otomatik tahmin etmez ve yazıları otomatik tanımaz. Açık veya tutarsız ağlar için önce ağ onarımı gerekir; böyle bir modelde işlem hata verir, sessizce delikli çıktı üretmez. İşlem sonrası önizlemeyi kontrol edip modelinizi dışa aktarın.
+Araç seçilen yüzeyi **yerel bir düzleme** getirir. Eğri yüzeyin devamını otomatik tahmin etmez ve yazıları otomatik tanımaz. Açık veya tutarsız ağlarda yerel yüzey işlemi denenir ve belirgin uyarı gösterilir. Bu alternatif kaynak dosyanın tüm kusurlarını onarmaz; çıktı kapalı katı olarak garanti edilmez. İşlem sonrası önizlemeyi kontrol edip modelinizi dışa aktarın.
 
 Doğrulama: iç taban yazısı silinirken duvarların hacmi ve sınırları korunur, iç dik duvarda yerel normalle silme, çukur yazı doldurma ve bağlantısız parça ayrımı geometri testleriyle kontrol edilir. `tests/mesh-editor-ui.mjs`, gerçek fare seçimiyle STL/3MF/OBJ içe aktarmayı, iç yüzey düzlemeyi, çıktı hacmini, geri almayı, kesit görünümünü ve sekme korumasını test eder. `KATMAN_NATIVE=1` paketli Windows EXE üzerinde aynı kontrolü yapar. `KATMAN_URL` ile LAN adresi de test edilebilir.
 
@@ -107,3 +107,9 @@ Testler: bağımsız bölgeler, delikler, rastgele maskelerde alan/hacim, kapal�
 Teknoloji: Electron, Three.js, Earcut, Potrace, fflate, esbuild. Sürümler `package-lock.json` içinde sabitlenmiştir.
 
 2.6 kontur düzeltmesi: Eğri birleştirmesinin ürettiği uzak teğet kesişimleri artık gerçek köşe olarak kullanılmaz. Köşe koruması, özgün çokgen ve kaynak sınırına yakınlık denetimiyle yapılır.  C ve L harflerindeki kenar çıkıntıları için kapalı ve kavşakta kesilen sınırlar Potrace kontur optimizasyonuna geçirildi. Tek noktadan oluşan ve çevresi aynı renkle kaplı JPEG lekeleri otomatik temizlenir. Sınır bir kez üretilip iki renkte ters yönlü paylaşılır. L tabanındaki seyrek raster çıkıntılarının düz bir vektör kenara dönüşmesi için ayrıca regresyon testi vardır. Potrace kaynak uyarlaması `src/vendor/potrace-curves.js`, tam GPL-2.0 lisansı `public/licenses/Potrace.txt` içindedir; matematik çekirdeği node-potrace 2.1.8 kaynaklarından alınmıştır. [Kaynak](https://github.com/tooolbox/node-potrace).
+
+## 3.2 — Görünür işlem sonucu ve kusurlu ağlarda yerel kesim
+
+Kesim/düzleme sırasında ilerleme, süre ve iptal düğmesi gösterilir. Etkisiz seçimler başarılı sayılmaz; belirgin hata verir ve modeli değiştirmez. Geçerli katılar Manifold ile işlenir. Kapalı katı kontrolünden geçemeyen dosyalarda three-bvh-csg ile yerel yüzey işlemi denenir; seçim hacimlerinin dışındaki kaynak üçgenler korunur. Kusurlu kaynak ağın tamamı onarılmaz ve çıktı kapalı katı olarak garanti edilmez; bu durum sonuçta açıkça belirtilir.
+
+Gerçek Gallardo dosyasıyla regresyon: `TEST_MODEL` ortam değişkenini kaynak 3MF yoluna ayarlayıp `node tests/mesh-real-edit.mjs` çalıştırın. Test arayüzden yazıyı keser, dışa aktarılan STL’de kaybolduğunu, uzaktaki üçgenlerin korunduğunu ve geri almanın kaynağı geri getirdiğini doğrular. Model dosyası depoya eklenmez.
