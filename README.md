@@ -1,4 +1,4 @@
-# Katman Studio 3.4 — Otomatik görselden vektör ve 3D
+# Katman Studio 3.5 — Otomatik görselden vektör ve 3D
 
 Uygulama boş açılır. Görseli ekleyin; renk ayrımı, düzgün vektör eğrileri ve ayrıntı kalitesi otomatik hazırlanır. Piksel çözünürlüğü, kenar filtresi, gölge veya Z büyütme ayarı yapmanız gerekmez.
 
@@ -123,3 +123,9 @@ Gerçek Gallardo dosyasıyla regresyon: `TEST_MODEL` ortam değişkenini kaynak 
 Sağdaki **Alan doldur / yüzey çiz** paneli noktalarla çizilen kapalı alana malzeme ekler. **Dolgu düzlemini yüzeyden al** ile mevcut yüzeye tıklayın; seçilmiş alan korunarak bu düzleme izdüşürülür. Üst yüzey aynı düzlemde olur; istenirse referansa göre yükseklik farkı girilir. **Z yüksekliği gir** seçeneğinde üst yüzeyin mutlak Z koordinatı belirlenir. Dolgunun altı modelin ilgili yöndeki alt sınırına kadar uzanır veya kullanıcı tarafından girilen kalınlık kullanılır. **Dolgu hacmini önizle** eklenecek hacmi gösterir. **Seçili alanı doldur** gerçek geometriye ekler; geri alma ve tüm çıktı biçimleri desteklenir. Eğri yüzeyin devamı otomatik tahmin edilmez; referans bir düzlemdir.
 
 `node tests/mesh-fill-ui.mjs` arayüzden yüzey referansı alırken seçimin korunmasını, aynı düzleme doldurmayı, sayısal Z yüksekliğini, önizlemeyi ve STL çıktısındaki hacmi doğrular. `KATMAN_NATIVE=1` ile paketlenmiş EXE üzerinde çalışır.
+
+## 3.5 — Etkileşim ve büyük model performansı
+
+Sabit görünüm sürekli çizilmez; kamera/alan/model değiştiğinde çizilir ve kamera yumuşatması tamamlanınca durur. Görünmeyen çalışma alanları durur. Kapatılmış alan üzerinde fare hareketi dolgu hesabını tekrarlamaz; sabit seçim ve dolgu geometrileri yeniden kullanılır. Taslak fare hareketleri kare başına birleştirilir. Görünüm tamponları ve BVH seçim ağacı arka planda hazırlanır; üçgen sırası ve model geometrisi korunur. Geri alma görünüm tamponlarını yeniden kullanır. Zemine taşıma ve STL/3MF/OBJ üretimi arka planda çalışır. Normal masaüstü açılışı ekran kartını kullanır; yazılımsal çizim yalnızca otomatik testlerde isteğe bağlıdır.
+
+`node tests/mesh-performance.mjs` gerçek modelde hareketsiz çizim sayısını ve kapalı seçim üzerindeki fare hareketi maliyetini ölçer. `TEST_MODEL` dosya yolunu, `PERF_ASSERT=1` performans kontrollerini etkinleştirir. Bu bilgisayarda 340.607 üçgenlik dosyada 600 ms içindeki hareketsiz çizim çağrıları 178’den 0’a, 80 fare hareketinin JavaScript süresi yaklaşık 661 ms’den 1 ms altına indi. Bunlar yerel ölçümlerdir; kesim motorunun toplam süresi veya bütün bilgisayarlar için FPS garantisi değildir.

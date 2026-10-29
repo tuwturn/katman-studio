@@ -1,3 +1,4 @@
+import {capture} from './capture.mjs';
 import {createRequire} from 'node:module';
 import {mkdir,readFile} from 'node:fs/promises';
 import path from 'node:path';
@@ -27,7 +28,7 @@ try{
  state=JSON.parse(await readFile(await save('native-free-height.katman','#save-project'),'utf8'));assert.equal(state.regions[0].height,42.36);assert.equal(state.regions[1].height,42.36);assert.equal(state.regions[2].height,.08);
  await page.locator('#workspace-scope').selectOption('range');await clickPoint(8,8);await page.locator('#color-tolerance').fill('100');assert.equal(await page.locator('#selection-count').textContent(),'3 bölge seçildi');await page.locator('#color-tolerance').fill('0');assert.equal(await page.locator('#selection-count').textContent(),'2 bölge seçildi');
  await page.locator('#workspace-scope').selectOption('region');const a=await imagePoint(64,4),b=await imagePoint(116,76);await page.mouse.move(a.x,a.y);await page.mouse.down();await page.mouse.move(b.x,b.y,{steps:12});await page.mouse.up();assert.equal(await page.locator('#selection-count').textContent(),'2 bölge seçildi');
- await page.locator('#selection-height').fill('250');await page.locator('#apply-height').click();await page.locator('#view-perspective').click();await page.screenshot({path:'test-results/desktop-native.png'});
+ await page.locator('#selection-height').fill('250');await page.locator('#apply-height').click();await page.locator('#view-perspective').click();await capture(page,electronApp,{path:'test-results/desktop-native.png'});
  const model=strFromU8(unzipSync(new Uint8Array(await readFile(await save('desktop-250mm.3mf'))))['3D/3dmodel.model']);assert.equal(Math.max(...[...model.matchAll(/ z="([\d.]+)"/g)].map(m=>Number(m[1]))),250.04);
  await page.locator('#selection-height').fill('300');await page.locator('#apply-height').click();assert.equal(await page.locator('#selection-height').inputValue(),'250');
  await page.locator('#project-file').setInputFiles('test-results/native-250.katman');await page.waitForFunction(()=>!document.querySelector('#vectorize').disabled);await page.locator('#view-2d').click();await clickPoint(8,8);assert.equal(await page.locator('#selection-height').inputValue(),'250');

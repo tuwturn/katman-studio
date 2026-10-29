@@ -1,3 +1,4 @@
+import {demandRenderer} from './demand-render.js';
 import {backgroundRemoved,regionVisible} from './background.js';
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
@@ -8,7 +9,7 @@ import {matchingRegions,vectorRegionsInRectangle} from './selection.js';
 const $=id=>document.getElementById(id);
 let project=null,original=null,selection=new Set(),mode='color',parts=[],meshes=[],busy=false,regionPage=0,sourceName='Yeni çalışma';
 let renderer,scene,camera,controls,group,grid,ground;
-let meshEditing=false;
+let meshEditing=false,invalidateScene=()=>{};
 let toastTimer,selectionScope='region',brushSelect=false,workspace2d=false,rangeAnchor=null;
 function toast(message){$('toast').textContent=message;$('toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('show'),4500);}
 function fail(e){console.error(e);toast(e.message||String(e));$('status').textContent=e.message||'İşlem tamamlanamadı.';}
@@ -27,8 +28,8 @@ function init3D(){
   renderer.domElement.addEventListener('pointermove',e=>{if(brushSelect&&pointerStart){const id=pick(e);if(id!==undefined)selectRegion(id,true,true);}});
   renderer.domElement.addEventListener('pointerup',e=>{const start=pointerStart;pointerStart=null;if(!start||brushSelect||Math.hypot(e.clientX-start[0],e.clientY-start[1])>5||e.button!==0)return;const id=pick(e);if(id!==undefined)selectRegion(id,e.ctrlKey||e.metaKey||e.shiftKey);});
   renderer.domElement.addEventListener('pointercancel',()=>pointerStart=null);
-  new ResizeObserver(()=>{const w=$('viewport').clientWidth,h=$('viewport').clientHeight;if(!w||!h)return;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h);if(workspace2d)drawVectorWorkspace();}).observe($('viewport'));
-  renderer.setAnimationLoop(()=>{if(meshEditing)return;controls.update();renderer.render(scene,camera);});
+  new ResizeObserver(()=>{const w=$('viewport').clientWidth,h=$('viewport').clientHeight;if(!w||!h)return;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h);if(workspace2d)drawVectorWorkspace();invalidateScene();}).observe($('viewport'));
+  invalidateScene=demandRenderer({render:()=>renderer.render(scene,camera),update:()=>controls.update(),visible:()=>!meshEditing&&!workspace2d&&!document.hidden&&$('viewport').clientWidth>0});controls.addEventListener('change',invalidateScene);document.addEventListener('visibilitychange',invalidateScene);invalidateScene();
 }
 function fit(top=false){if(!camera||!project)return;const w=project.modelWidth,h=w*project.height/project.width,z=(project.baseHeight+project.regions.reduce((m,r)=>regionVisible(project,r)?Math.max(m,r.height):m,0)),radius=Math.hypot(w,h,z)/2,angle=Math.min(camera.fov*Math.PI/360,Math.atan(Math.tan(camera.fov*Math.PI/360)*camera.aspect)),distance=radius/Math.sin(angle)*1.08;controls.target.set(0,0,z/2);const direction=new THREE.Vector3(...(top?[0,-.00001,1]:[.95,-1.25,1.15])).normalize();camera.position.copy(controls.target).addScaledVector(direction,distance);camera.near=.01;camera.far=Math.max(5000,distance*5);controls.maxDistance=Math.max(4000,distance*5);camera.updateProjectionMatrix();controls.update();$('view-top').classList.toggle('active',top);$('view-perspective').classList.toggle('active',!top);}
 function rebuild(fitView=false){
@@ -64,7 +65,7 @@ function renderList(){if(!project)return;const list=$('layer-list');list.replace
   }
   if(mode==='region'&&project.regions.length>120){const bar=document.createElement('div');bar.style.cssText='display:flex;justify-content:space-between;align-items:center;font-size:9px;grid-column:1/-1;padding:8px';const prev=document.createElement('button'),next=document.createElement('button');prev.textContent='← Önceki';next.textContent='Sonraki →';prev.className=next.className='secondary';prev.disabled=regionPage===0;next.disabled=(regionPage+1)*120>=project.regions.length;prev.onclick=()=>{regionPage--;renderList();};next.onclick=()=>{regionPage++;renderList();};bar.append(prev,document.createTextNode(`${regionPage+1} / ${Math.ceil(project.regions.length/120)}`),next);list.append(bar);}
 }
-function updateSelection(redraw=false){if(!project)return;$('selection-count').textContent=selection.size?`${selection.size} bölge seçildi`:'Seçim yok';const heights=[...new Set([...selection].map(id=>project.regions[id].height))];if(heights.length===1)$('selection-height').value=heights[0];$('selected-height-stat').textContent=heights.length===1?format(heights[0])+' mm':heights.length>1?'Çeşitli':'—';for(const m of meshes){for(const material of m.material){if(material.emissive){material.emissive.set(selection.has(m.userData.regionId)?'#375489':'#000000');material.emissiveIntensity=.13;}else{material.color.set(m.userData.color);}}}if(redraw){drawSource();renderList();}}
+function updateSelection(redraw=false){invalidateScene();if(!project)return;$('selection-count').textContent=selection.size?`${selection.size} bölge seçildi`:'Seçim yok';const heights=[...new Set([...selection].map(id=>project.regions[id].height))];if(heights.length===1)$('selection-height').value=heights[0];$('selected-height-stat').textContent=heights.length===1?format(heights[0])+' mm':heights.length>1?'Çeşitli':'—';for(const m of meshes){for(const material of m.material){if(material.emissive){material.emissive.set(selection.has(m.userData.regionId)?'#375489':'#000000');material.emissiveIntensity=.13;}else{material.color.set(m.userData.color);}}}if(redraw){drawSource();renderList();}}
 function scopeIds(id){if(backgroundRemoved(project,project.regions[id]))return [];return (selectionScope==='region'?[id]:matchingRegions(project.regions,project.palette,id,selectionScope==='range'?Number($('color-tolerance').value):0)).filter(i=>!backgroundRemoved(project,project.regions[i]));}
 function selectWorkspaceIds(ids,multi=false,addOnly=false){const already=ids.length&&ids.every(i=>selection.has(i));if(!multi)selection.clear();if(multi&&already&&!addOnly)ids.forEach(i=>selection.delete(i));else ids.forEach(i=>selection.add(i));if(mode==='region'&&ids.length)regionPage=Math.floor(ids[0]/120);updateSelection(true);}
 function selectRegion(id,multi,addOnly=false){if(!project)return;rangeAnchor=id;selectWorkspaceIds(scopeIds(id),multi,addOnly);}
@@ -101,7 +102,7 @@ $('import-image').onclick=$('empty-import').onclick=()=>$('file').click();
 // event here too can open two dialogs or save the project twice on macOS.
 if(!window.katmanDesktop)document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&['o','s'].includes(e.key.toLowerCase())){e.preventDefault();if(meshEditing){editorAction(e.key.toLowerCase()==='s'?'save':'open');return;}if(e.key.toLowerCase()==='s')saveProject();else if(e.shiftKey)$('project-file').click();else $('file').click();}});
 if(window.katmanDesktop){document.body.classList.add('native');if(window.katmanDesktop.platform==='darwin'){document.body.classList.add('mac');const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);for(let node;node=walker.nextNode();)if(node.parentElement.tagName!=='SCRIPT'&&node.nodeValue.includes('Ctrl'))node.nodeValue=node.nodeValue.replaceAll('Ctrl','⌘');}window.katmanDesktop.onAction(action=>{if(meshEditing){editorAction(action);return;}const ids={image:'file',open:'project-file',save:'save-project',export:'export',help:'help'};if(ids[action])$(ids[action]).click();});}
-function setWorkspace2D(value){workspace2d=value;$('workspace-2d').hidden=!value;$('view-2d').classList.toggle('active',value);if(value){$('view-top').classList.remove('active');$('view-perspective').classList.remove('active');drawSource();}}
+function setWorkspace2D(value){workspace2d=value;invalidateScene();$('workspace-2d').hidden=!value;$('view-2d').classList.toggle('active',value);if(value){$('view-top').classList.remove('active');$('view-perspective').classList.remove('active');drawSource();}}
 $('view-2d').onclick=()=>setWorkspace2D(true);
 $('workspace-scope').onchange=()=>{selectionScope=$('workspace-scope').value;$('tolerance-wrap').hidden=selectionScope!=='range';};
 $('color-tolerance').oninput=()=>{$('tolerance-value').textContent=$('color-tolerance').value+'%';if(project&&selectionScope==='range'&&rangeAnchor!==null)selectRegion(rangeAnchor,false,true);};
@@ -117,6 +118,6 @@ init3D();setBusy(false);
 
 const meshFrame=$('mesh-editor-frame');
 function editorAction(action){meshFrame.contentWindow?.postMessage({type:'katman-editor-action',action},location.origin);}
-function showEditor(value){meshEditing=value;document.querySelector('main.workspace').hidden=value;$('mesh-editor-host').hidden=!value;$('mode-mesh-editor').classList.toggle('active',value);$('mode-image-editor').classList.toggle('active',!value);if(value&&!meshFrame.getAttribute('src'))meshFrame.src='mesh-editor.html';$('save-project').disabled=value?false:busy||!project;$('import-image').firstChild.textContent=value?'＋ 3D dosyası aç ':'＋ Görsel ekle ';$('open-project').hidden=value;}
+function showEditor(value){meshEditing=value;invalidateScene();document.querySelector('main.workspace').hidden=value;$('mesh-editor-host').hidden=!value;$('mode-mesh-editor').classList.toggle('active',value);$('mode-image-editor').classList.toggle('active',!value);if(value&&!meshFrame.getAttribute('src'))meshFrame.src='mesh-editor.html';$('save-project').disabled=value?false:busy||!project;$('import-image').firstChild.textContent=value?'＋ 3D dosyası aç ':'＋ Görsel ekle ';$('open-project').hidden=value;}
 $('mode-mesh-editor').onclick=()=>showEditor(true);$('mode-image-editor').onclick=()=>showEditor(false);
 document.addEventListener('click',e=>{if(!meshEditing)return;const button=e.target.closest('button'),actions={'import-image':'image','open-project':'open','save-project':'save','export':'export','help':'help'};if(actions[button?.id]){e.preventDefault();e.stopImmediatePropagation();editorAction(actions[button.id]);}},true);

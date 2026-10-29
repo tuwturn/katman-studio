@@ -1,6 +1,6 @@
 {
   "name": "katman-image-to-3mf",
-  "version": "3.4.0",
+  "version": "3.5.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -18,7 +18,8 @@
     "manifold-3d": "3.5.4",
     "potrace": "2.1.8",
     "three": "0.180.0",
-    "three-bvh-csg": "0.0.18"
+    "three-bvh-csg": "0.0.18",
+    "three-mesh-bvh": "0.9.17"
   },
   "devDependencies": {
     "electron": "45.0.0",
