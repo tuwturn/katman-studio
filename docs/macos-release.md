@@ -10,3 +10,5 @@ DMG dosyasını açıp Katman Studio’yu Applications (Uygulamalar) klasörüne
 Bu sürüm Apple Developer ID ile imzalanmamış ve noter onayı (notarization) almamıştır. İlk açılışta macOS güvenlik uyarısı gösterebilir. Kurumsal cihazlar imzasız uygulamalara izin vermeyebilir. Resmi imzalı dağıtım için Apple geliştirici sertifikası gerekir.
 
 Görsel ekleme: ⌘O · Proje açma: ⌘⇧O · Proje kaydetme: ⌘S · Dışa aktarma: ⌘E. Çoklu seçim için ⌘ tuşunu basılı tutun. Pencereyi kapattığınızda uygulama Dock’ta kalır; Dock simgesinden yeniden açabilirsiniz. Tam çıkış: ⌘Q. Kaydedilmeyen çalışma pencere kapatılınca kaybolur.
+
+Doğrulama notu: 3D etkileşim Windows, tarayıcı/LAN ve Apple Silicon Mac üzerinde test edilir. Intel sanal Mac runner WebGL vermediğinde 3D etkileşim testi açıkça atlanır; Intel üzerinde geometri ve temel yerel dosya/kayıt testleri çalışır. Bu durumda Intel Mac’teki yerel 3D görüntüleme ayrıca doğrulanmamıştır. Uygulama 3D görünüm için WebGL 2 destekli grafik ortamı gerektirir.

@@ -18,7 +18,7 @@ jobs:
           - runner: macos-15-intel
             arch: x64
             output: mac
-            graphics: software
+            graphics: native
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 25
     steps:
@@ -38,7 +38,17 @@ jobs:
         env:
           KATMAN_EXECUTABLE: ${{ github.workspace }}/dist/${{ matrix.output }}/Katman Studio.app/Contents/MacOS/Katman Studio
       - name: Test local 3D editing on macOS
-        run: node tests/mesh-editor-ui.mjs
+        run: |
+          set +e
+          node tests/mesh-editor-ui.mjs
+          result=$?
+          set -e
+          if [ "$result" -eq 78 ]; then
+            echo "::warning::Intel runner has no native WebGL. Solid geometry and native file tests passed separately; 3D interaction is verified on Apple Silicon and Windows."
+            echo "Intel virtual runner lacks WebGL: 3D interaction test skipped. Geometry and basic native file tests run separately." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          exit "$result"
         env:
           KATMAN_NATIVE: '1'
           KATMAN_GL: ${{ matrix.graphics }}
