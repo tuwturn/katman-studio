@@ -1,4 +1,4 @@
-# Katman Studio 3.2 — Otomatik görselden vektör ve 3D
+# Katman Studio 3.3 — Otomatik görselden vektör ve 3D
 
 Uygulama boş açılır. Görseli ekleyin; renk ayrımı, düzgün vektör eğrileri ve ayrıntı kalitesi otomatik hazırlanır. Piksel çözünürlüğü, kenar filtresi, gölge veya Z büyütme ayarı yapmanız gerekmez.
 
@@ -12,12 +12,12 @@ Uygulama boş açılır. Görseli ekleyin; renk ayrımı, düzgün vektör eğri
 
 1. Gerekirse sağdan **Kesit görünümü** ile ön yüzeyleri gizleyin ve iç kısma ulaşın. Bu sadece görüntüdür; dışa aktarılan model kesilmez.
 2. **Düz yüzeyden referans seç** ile yazının yanındaki temiz zemine / iç duvara tıklayın. **Yüzeye bak** görünümü bu yüzeye çevirir. Mavi ok işlem yönünü gösterir.
-3. **Dikdörtgen alan çiz** ile yazının etrafına kutu çizin (temiz yüzeyden başlarsanız referans otomatik alınır. Boşluktan da başlayıp doğrudan tam kesim alanı seçebilirsiniz; bu durumda düzleme için ayrıca temiz yüzey referansı gerekir) veya daireyle birden fazla alan işaretleyin. Alanı yalnızca kaldırılacak yazıyla sınırlayın.
+3. **Noktalarla alan seç** ile sınır noktalarını sırayla tıklayın. İlk noktaya tekrar tıklayın veya Enter ile kapatın; taralı alan işlem görecektir. Backspace son noktayı geri alır. Düzleme/doldurma için önce temiz yüzeyden referans seçin; tam kesimde görünüm düzlemi yeterlidir. İsteğe bağlı kutu ve daire araçları da bulunur. Alanı yalnızca kaldırılacak yazıyla sınırlayın.
 4. Derinliği yazıyı kapsayacak şekilde ayarlayıp **Çıkıntılı yazıyı düzle** veya **Çukur yazıyı doldur** seçin. Ofset 0, referans yüzey seviyesidir. Yön yanlışsa ters çevrilebilir. İşlem seçilen parçada, seçilen alan ve derinlikle sınırlıdır; sonsuz bir düzlemle bütün gövde kesilmez.
 5. Sarkıtılmış yazı veya bölümü kalınlığı boyunca kaldırmak için **Seçili alanı tamamen kes** kullanılır. Bu işlem sadece kutu/daire ayak izini kaldırır; bütün modeli düzlemle kesmez.
 6. Ayrı duran yazı/harfler için **Bağlantısız parçaları ayır**, sonra parçayı seçip **Seçili parçaları sil** kullanılabilir. Gövdeye kaynaşmış yazı için yerel düzleme kullanılır. Ctrl / ⌘ ile çoklu parça seçilebilir.
 
-Referans modunda sol sürükleme modeli döndürür. Sağ sürükleme ve tekerlek bütün seçim araçlarında açık kalır. **Görünümü kaydır** modunda sol sürükleme de kaydırır. **Görünüme sığdır** kamerayı modele getirir.
+Referans modunda sol sürükleme modeli döndürür. Sağ sürükleme modeli döndürür, tekerleğe basılı sürükleme kaydırır, tekerleği çevirme yakınlaştırır; bu kontroller bütün seçim araçlarında çalışır. **Görünümü kaydır** modunda sol sürükleme de kaydırır. **Görünüme sığdır** kamerayı modele getirir.
 
 **Geri al / Yinele** son 12 işlemi tutar. Uzun geometri işlemleri iptal edilebilir; iptal edilen işlem modele uygulanmaz. Düzenleme motoru tarayıcıdaki WebAssembly worker içinde çalışır; model sunucuya yüklenmez ve internet gerekmez.
 
@@ -113,3 +113,7 @@ Teknoloji: Electron, Three.js, Earcut, Potrace, fflate, esbuild. Sürümler `pac
 Kesim/düzleme sırasında ilerleme, süre ve iptal düğmesi gösterilir. Etkisiz seçimler başarılı sayılmaz; belirgin hata verir ve modeli değiştirmez. Geçerli katılar Manifold ile işlenir. Kapalı katı kontrolünden geçemeyen dosyalarda three-bvh-csg ile yerel yüzey işlemi denenir; seçim hacimlerinin dışındaki kaynak üçgenler korunur. Kusurlu kaynak ağın tamamı onarılmaz ve çıktı kapalı katı olarak garanti edilmez; bu durum sonuçta açıkça belirtilir.
 
 Gerçek Gallardo dosyasıyla regresyon: `TEST_MODEL` ortam değişkenini kaynak 3MF yoluna ayarlayıp `node tests/mesh-real-edit.mjs` çalıştırın. Test arayüzden yazıyı keser, dışa aktarılan STL’de kaybolduğunu, uzaktaki üçgenlerin korunduğunu ve geri almanın kaynağı geri getirdiğini doğrular. Model dosyası depoya eklenmez.
+
+## 3.3 — Noktalarla seçim
+
+İçbükey çokgen sınırları desteklenir; kesim çokgenin gerçek içinden yapılır. Çizgileri kesişen seçimler uygulanmaz. Taralı önizleme ve sınır noktaları görünür; Enter / ilk noktaya tıklama seçimi kapatır, Backspace son noktayı geri alır. Tekerleğe basılı sürükleme kaydırır; sağ sürükleme döndürür.

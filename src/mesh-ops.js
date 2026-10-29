@@ -1,3 +1,4 @@
+import {polygonPoints} from './selection-polygon.js';
 // Local solid edits: the cutter is bounded in all three directions and aligned
 // to a picked surface. It never becomes an infinite slicer plane.
 export function toSolid(wasm,part){
@@ -16,8 +17,8 @@ export function localCutter(wasm,area,mode,color=[.48,.63,.85]){
  if(![width,height,depth].every(x=>Number.isFinite(x)&&x>0))throw new Error('Alan ve işlem derinliği sıfırdan büyük olmalı.');
  if(![u,v,n,center].every(a=>a?.length===3&&a.every(Number.isFinite)))throw new Error('Önce düzeltilecek yüzeyden referans seçin.');
  const bottom=mode==='fill'?offset-depth:offset;
- const primitive=shape==='circle'?wasm.Manifold.cylinder(depth,width/2,width/2,64,false):wasm.Manifold.cube([width,height,depth],true);
- const raw=shape==='circle'?primitive:primitive.translate([0,0,depth/2]);if(raw!==primitive)primitive.delete();
+ const primitive=shape==='polygon'?wasm.Manifold.extrude([polygonPoints(area.points)],depth):shape==='circle'?wasm.Manifold.cylinder(depth,width/2,width/2,64,false):wasm.Manifold.cube([width,height,depth],true);
+ const raw=shape==='box'?primitive.translate([0,0,depth/2]):primitive;if(raw!==primitive)primitive.delete();
  const transform=[...u,0,...v,0,...n,0,...center.map((x,i)=>x+n[i]*bottom),1];
  const moved=raw.transform(transform),colored=moved.setProperties(3,p=>{for(let i=0;i<3;i++)p[i]=color[i];});raw.delete();moved.delete();return colored;
 }
