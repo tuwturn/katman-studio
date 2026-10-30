@@ -7,3 +7,5 @@
 .viewbar .shadow-switch{display:flex;align-items:center;gap:6px;white-space:nowrap;margin:0 12px 0 0;color:#bdd0ec;font-size:10px}.shadow-switch input{accent-color:#9bbdff}
 
 .viewbar{flex-wrap:wrap;height:auto;min-height:44px;padding-top:5px;padding-bottom:5px}
+
+body.preview-only{grid-template-columns:1fr}body.preview-only aside{display:none}body.preview-only main{grid-column:1;grid-row:1}body.preview-only #model-ground{display:none}

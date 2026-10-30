@@ -5,3 +5,7 @@ Masaustu/
 .electron-cache/
 dist/
 .DS_Store
+local-ai/.runtime/
+local-ai/text-config-inspect.yaml
+
+local-ai/__pycache__/

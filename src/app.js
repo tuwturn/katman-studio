@@ -1,3 +1,4 @@
+import {initLocalAI} from './local-ai-ui.js';
 import {historyKey,isTextEntry} from './editor-history.js';
 import {demandRenderer} from './demand-render.js';
 import {backgroundRemoved,regionVisible} from './background.js';
@@ -10,7 +11,7 @@ import {matchingRegions,vectorRegionsInRectangle} from './selection.js';
 const $=id=>document.getElementById(id);
 let project=null,original=null,selection=new Set(),mode='color',parts=[],meshes=[],busy=false,regionPage=0,sourceName='Yeni çalışma';
 let renderer,scene,camera,controls,group,grid,ground;
-let meshEditing=false,invalidateScene=()=>{};
+let meshEditing=false,aiEditing=false,invalidateScene=()=>{};
 let toastTimer,selectionScope='region',brushSelect=false,workspace2d=false,rangeAnchor=null;
 function toast(message){$('toast').textContent=message;$('toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('show'),4500);}
 function fail(e){console.error(e);toast(e.message||String(e));$('status').textContent=e.message||'İşlem tamamlanamadı.';}
@@ -30,7 +31,7 @@ function init3D(){
   renderer.domElement.addEventListener('pointerup',e=>{const start=pointerStart;pointerStart=null;if(!start||brushSelect||Math.hypot(e.clientX-start[0],e.clientY-start[1])>5||e.button!==0)return;const id=pick(e);if(id!==undefined)selectRegion(id,e.ctrlKey||e.metaKey||e.shiftKey);});
   renderer.domElement.addEventListener('pointercancel',()=>pointerStart=null);
   new ResizeObserver(()=>{const w=$('viewport').clientWidth,h=$('viewport').clientHeight;if(!w||!h)return;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h);if(workspace2d)drawVectorWorkspace();invalidateScene();}).observe($('viewport'));
-  invalidateScene=demandRenderer({render:()=>renderer.render(scene,camera),update:()=>controls.update(),visible:()=>!meshEditing&&!workspace2d&&!document.hidden&&$('viewport').clientWidth>0});controls.addEventListener('change',invalidateScene);document.addEventListener('visibilitychange',invalidateScene);invalidateScene();
+  invalidateScene=demandRenderer({render:()=>renderer.render(scene,camera),update:()=>controls.update(),visible:()=>!meshEditing&&!aiEditing&&!workspace2d&&!document.hidden&&$('viewport').clientWidth>0});controls.addEventListener('change',invalidateScene);document.addEventListener('visibilitychange',invalidateScene);invalidateScene();
 }
 function fit(top=false){if(!camera||!project)return;const w=project.modelWidth,h=w*project.height/project.width,z=(project.baseHeight+project.regions.reduce((m,r)=>regionVisible(project,r)?Math.max(m,r.height):m,0)),radius=Math.hypot(w,h,z)/2,angle=Math.min(camera.fov*Math.PI/360,Math.atan(Math.tan(camera.fov*Math.PI/360)*camera.aspect)),distance=radius/Math.sin(angle)*1.08;controls.target.set(0,0,z/2);const direction=new THREE.Vector3(...(top?[0,-.00001,1]:[.95,-1.25,1.15])).normalize();camera.position.copy(controls.target).addScaledVector(direction,distance);camera.near=.01;camera.far=Math.max(5000,distance*5);controls.maxDistance=Math.max(4000,distance*5);camera.updateProjectionMatrix();controls.update();$('view-top').classList.toggle('active',top);$('view-perspective').classList.toggle('active',!top);}
 function rebuild(fitView=false){
@@ -101,8 +102,8 @@ $('save-project').onclick=saveProject;$('open-project').onclick=()=>$('project-f
 $('import-image').onclick=$('empty-import').onclick=()=>$('file').click();
 // Native menu accelerators handle these keys in Electron. Handling the same
 // event here too can open two dialogs or save the project twice on macOS.
-if(!window.katmanDesktop)document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&['o','s'].includes(e.key.toLowerCase())){e.preventDefault();if(meshEditing){editorAction(e.key.toLowerCase()==='s'?'save':'open');return;}if(e.key.toLowerCase()==='s')saveProject();else if(e.shiftKey)$('project-file').click();else $('file').click();}});
-if(window.katmanDesktop){document.body.classList.add('native');if(window.katmanDesktop.platform==='darwin'){document.body.classList.add('mac');const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);for(let node;node=walker.nextNode();)if(node.parentElement.tagName!=='SCRIPT'&&node.nodeValue.includes('Ctrl'))node.nodeValue=node.nodeValue.replaceAll('Ctrl','⌘');}window.katmanDesktop.onAction(action=>{if(!meshEditing&&['undo','redo'].includes(action)){if(isTextEntry(document.activeElement))document.execCommand(action);return;}if(meshEditing){editorAction(action);return;}const ids={image:'file',open:'project-file',save:'save-project',export:'export',help:'help'};if(ids[action])$(ids[action]).click();});}
+if(!window.katmanDesktop)document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&['o','s'].includes(e.key.toLowerCase())){e.preventDefault();if(aiEditing){aiUI.action(e.key.toLowerCase()==='s'?'save':'open');return;}if(meshEditing){editorAction(e.key.toLowerCase()==='s'?'save':'open');return;}if(e.key.toLowerCase()==='s')saveProject();else if(e.shiftKey)$('project-file').click();else $('file').click();}});
+if(window.katmanDesktop){document.body.classList.add('native');if(window.katmanDesktop.platform==='darwin'){document.body.classList.add('mac');const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);for(let node;node=walker.nextNode();)if(node.parentElement.tagName!=='SCRIPT'&&node.nodeValue.includes('Ctrl'))node.nodeValue=node.nodeValue.replaceAll('Ctrl','⌘');}window.katmanDesktop.onAction(action=>{if(!meshEditing&&['undo','redo'].includes(action)){if(isTextEntry(document.activeElement))document.execCommand(action);return;}if(aiEditing){aiUI.action(action);return;}if(meshEditing){editorAction(action);return;}const ids={image:'file',open:'project-file',save:'save-project',export:'export',help:'help'};if(ids[action])$(ids[action]).click();});}
 function setWorkspace2D(value){workspace2d=value;invalidateScene();$('workspace-2d').hidden=!value;$('view-2d').classList.toggle('active',value);if(value){$('view-top').classList.remove('active');$('view-perspective').classList.remove('active');drawSource();}}
 $('view-2d').onclick=()=>setWorkspace2D(true);
 $('workspace-scope').onchange=()=>{selectionScope=$('workspace-scope').value;$('tolerance-wrap').hidden=selectionScope!=='range';};
@@ -119,9 +120,14 @@ init3D();setBusy(false);
 
 const meshFrame=$('mesh-editor-frame');
 function editorAction(action){meshFrame.contentWindow?.postMessage({type:'katman-editor-action',action,allowText:document.activeElement===meshFrame},location.origin);}
-function showEditor(value){meshEditing=value;invalidateScene();document.querySelector('main.workspace').hidden=value;$('mesh-editor-host').hidden=!value;$('mode-mesh-editor').classList.toggle('active',value);$('mode-image-editor').classList.toggle('active',!value);if(value&&!meshFrame.getAttribute('src'))meshFrame.src='mesh-editor.html';$('save-project').disabled=value?false:busy||!project;$('import-image').firstChild.textContent=value?'＋ 3D dosyası aç ':'＋ Görsel ekle ';$('open-project').hidden=value;}
+function showEditor(value){aiEditing=false;aiUI.hide();$('local-ai-host').hidden=true;$('mode-local-ai').classList.remove('active');$('import-image').hidden=false;meshEditing=value;invalidateScene();document.querySelector('main.workspace').hidden=value;$('mesh-editor-host').hidden=!value;$('mode-mesh-editor').classList.toggle('active',value);$('mode-image-editor').classList.toggle('active',!value);if(value&&!meshFrame.getAttribute('src'))meshFrame.src='mesh-editor.html';$('save-project').disabled=value?false:busy||!project;$('import-image').firstChild.textContent=value?'＋ 3D dosyası aç ':'＋ Görsel ekle ';$('open-project').hidden=value;}
 $('mode-mesh-editor').onclick=()=>showEditor(true);$('mode-image-editor').onclick=()=>showEditor(false);
-document.addEventListener('click',e=>{if(!meshEditing)return;const button=e.target.closest('button'),actions={'import-image':'image','open-project':'open','save-project':'save','export':'export','help':'help'};if(actions[button?.id]){e.preventDefault();e.stopImmediatePropagation();editorAction(actions[button.id]);}},true);
+document.addEventListener('click',e=>{if(!meshEditing&&!aiEditing)return;const button=e.target.closest('button'),actions={'import-image':'image','open-project':'open','save-project':'save','export':'export','help':'help'};if(actions[button?.id]){e.preventDefault();e.stopImmediatePropagation();if(aiEditing)aiUI.action(actions[button.id]);else editorAction(actions[button.id]);}},true);
 
 // Browser shortcuts also reach the 3D editor when the toolbar has focus.
 document.addEventListener('keydown',event=>{if(!meshEditing)return;const action=historyKey(event);if(action&&!isTextEntry(event.target)){event.preventDefault();editorAction(action);}});
+
+let pendingGenerated=null;const aiUI=initLocalAI({onEdit(part,name){pendingGenerated={part,name};showEditor(true);sendGenerated();},onModelReady(ready){if(aiEditing)$('save-project').disabled=!ready;}});
+function sendGenerated(){if(!pendingGenerated||meshFrame.dataset.ready!=='1')return;meshFrame.contentWindow.postMessage({type:'katman-generated-model',parts:[pendingGenerated.part],name:pendingGenerated.name,token:'editor-import'},location.origin);pendingGenerated=null;}
+meshFrame.addEventListener('load',()=>{meshFrame.dataset.ready='1';sendGenerated();});
+$('mode-local-ai').onclick=()=>{aiEditing=true;meshEditing=false;invalidateScene();document.querySelector('main.workspace').hidden=true;$('mesh-editor-host').hidden=true;$('local-ai-host').hidden=false;$('mode-image-editor').classList.remove('active');$('mode-mesh-editor').classList.remove('active');$('mode-local-ai').classList.add('active');$('import-image').hidden=true;$('open-project').hidden=true;$('save-project').disabled=true;aiUI.show();};

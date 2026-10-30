@@ -1,4 +1,4 @@
-# Katman Studio 3.7 — Otomatik görselden vektör ve 3D
+# Katman Studio 3.8 — Otomatik görselden vektör ve 3D
 
 Uygulama boş açılır. Görseli ekleyin; renk ayrımı, düzgün vektör eğrileri ve ayrıntı kalitesi otomatik hazırlanır. Piksel çözünürlüğü, kenar filtresi, gölge veya Z büyütme ayarı yapmanız gerekmez.
 
@@ -143,3 +143,17 @@ Masaüstü Ctrl+Z / ⌘Z, 3D düzenleyicinin geçmişine yönlendirilir. Çizim 
 Gölge / derinlik anahtarı varsayılan açıktır. Yönlü ışık, daha düşük ortam aydınlatması, yüzeyler arası ve zemine düşen yumuşak gölgeler derinlik algısını artırır. Işık kadrajı modele uyar. Gölge haritası model/ışık/kesit değişince yenilenir; sabit görünüm sürekli çizilmez. Bu görsel efektler STL/3MF/OBJ geometrisine eklenmez.
 
 `tests/mesh-fill-ui.mjs` gerçek klavye ile nokta, alan ve iki ardışık geometri işleminin tek tek geri alınıp yinelenmesini; masaüstü menüsünü, metin alanını ve gölge açıp kapatmanın STL’yi değiştirmediğini doğrular.
+
+## 3.8 — Yazıdan 3D, tamamen yerel
+
+**Yazıdan 3D · Yerel YZ** sekmesi, bir bulut API’si yerine OpenAI Shap-E modelini bilgisayarda çalıştırır. [Resmî kaynak ve MIT lisansı](https://github.com/openai/shap-e). Türkçe tarif Helsinki-NLP/opus-mt-tr-en ile yerelde İngilizceye çevrilir; ardından gerçek difüzyon örneklemesi ve 3D yüzey çıkarımı yapılır. Hazır ördek/köylü şekilleri gösterilmez. Model kurulu değilse üretim devre dışıdır ve kurulum istenir.
+
+İlk kurulum Python 3.10–3.12, internet ve birkaç GB boş disk alanı gerektirir. **Yerel motoru kur / tamamla** ayrı bir Python ortamı oluşturur; Windows’ta Python çalışma dosyaları da bağımsız klasöre kopyalanır. Shap-E/CLIP kaynakları sabit commitlerden, resmî ağırlıklar SHA-256 kontrolüyle indirilir. Türkçe çeviri modeli de önceden indirilir. Sonraki üretimlerde ağ soketleri kapatılır; eksik model dosyası olduğunda gizlice internetten indirilmez, hata gösterilir. API anahtarı ve abonelik kullanılmaz.
+
+Bu sürüm işlemciyi kullanır; Windows Radeon RX 6700 XT’de CUDA varsayılmaz. Hesaplama ayrı süreçte ve sınırlı CPU iş parçacığıyla çalışır; arayüz kullanılabilir, üretim durdurulabilir. Üretim birkaç dakika veya daha uzun sürebilir. **Hızlı taslak** / **Daha ayrıntılı** seçenekleri ve varyasyon numarası vardır. Model yüksekliği 1–250 mm’dir. Sonuç gölgeli 3D önizlemede döndürülür; 3MF/STL/OBJ kaydedilir veya mevcut 3D düzenleyiciye aktarılır. Aktarım önceki modeli geri alma geçmişinde tutar.
+
+**Kalite sınırı:** Shap-E deneysel ve görece eski bir yerel modeldir. Basit figürler üretilebilir; gerçekçi insan, yüz/parmak, şapka veya tırpan gibi çoklu ince ayrıntıların tarife tam uyması garanti edilmez. Bu özellik profesyonel karakter modelleme veya baskıya hazır kapalı ağ garantisi vermez. Sonucu önizleyip gerekirse farklı tarif/varyasyon deneyin.
+
+Model ve sonuçlar Windows’ta `%APPDATA%/Katman Studio/Yerel-YZ` altında bulunur; `KATMAN_AI_HOME` ile değiştirilebilir. Hazır motor masaüstünde yerel IPC ile, tarayıcı/LAN kullanımında aynı bilgisayardaki Node sunucusu üzerinden çağrılır. Tarif bulut servisine gönderilmez. Mac’te ayrı Python kurulumu gerekebilir; yerel çıkarım bu geliştirme oturumunda Windows CPU üzerinde doğrulanır, Mac için aynı çıkarım doğrulaması yapılmış sayılmaz.
+
+Geliştirici kurulumu: `python local-ai/install.py --home <model-klasörü>`. Sonra `KATMAN_AI_HOME` bu klasöre ayarlanarak uygulama veya `server.mjs` başlatılabilir. Büyük model dosyaları ve ortam depoya/uygulama paketine eklenmez. `tests/local-ai-ui.mjs` açıkça test verisiyle arayüz/aktarım akışını; `tests/local-ai.test.mjs` istek doğrulamasını ve LAN sınırlarını kontrol eder. Gerçek motor testi ayrıca gerçek ağırlıklar kullanılarak yapılmalıdır.

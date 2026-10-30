@@ -1,4 +1,5 @@
-const {app, BrowserWindow, Menu, protocol, net, nativeTheme, session} = require('electron');
+const {app, BrowserWindow, Menu, protocol, net, nativeTheme, session,ipcMain} = require('electron');
+const {LocalAI}=require('./local-ai.cjs');
 const path = require('node:path');
 const {pathToFileURL} = require('node:url');
 protocol.registerSchemesAsPrivileged([{scheme:'katman',privileges:{standard:true,secure:true,supportFetchAPI:true,corsEnabled:true}}]);
@@ -7,10 +8,11 @@ app.setName('Katman Studio');
 const isMac=process.platform==='darwin';
 if(process.platform==='win32')app.setAppUserModelId('com.katman.studio');
 let window;
+let localAI;
 const root=path.resolve(__dirname,'../public');
 const action = async name => {if(!window)await createWindow();window?.webContents.send('katman:action',name);};
 async function createWindow(){
-  const win=new BrowserWindow({width:1460,height:960,minWidth:1060,minHeight:700,show:false,backgroundColor:'#101216',title:'Katman Studio 3.7',icon:path.join(root,'icon.png'),titleBarStyle:'hidden',...(isMac?{trafficLightPosition:{x:14,y:12}}:{titleBarOverlay:{color:'#121419',symbolColor:'#9baac4',height:37}}),webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
+  const win=new BrowserWindow({width:1460,height:960,minWidth:1060,minHeight:700,show:false,backgroundColor:'#101216',title:'Katman Studio 3.8',icon:path.join(root,'icon.png'),titleBarStyle:'hidden',...(isMac?{trafficLightPosition:{x:14,y:12}}:{titleBarOverlay:{color:'#121419',symbolColor:'#9baac4',height:37}}),webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
   window=win;
   win.webContents.on('before-input-event',(event,input)=>{if(input.type!=='keyDown'||!(input.control||input.meta)||input.alt)return;const key=input.key.toLowerCase();if(key==='z'||key==='y'){event.preventDefault();win.webContents.send('katman:action',key==='y'||input.shift?'redo':'undo');}});
   if(!isMac)win.setMenuBarVisibility(false);
@@ -21,6 +23,8 @@ async function createWindow(){
   await win.loadURL('katman://app/index.html');
 }
 app.whenReady().then(async()=>{
+  localAI=new LocalAI({home:process.env.KATMAN_AI_HOME||path.join(app.getPath('userData'),'Yerel-YZ'),scripts:path.resolve(__dirname,'../local-ai').replace('app.asar'+path.sep,'app.asar.unpacked'+path.sep)});
+  ipcMain.handle('katman:local-ai',(event,{action,data}={})=>{if(!event.senderFrame?.url.startsWith('katman://app/'))throw new Error('Yerel motor isteği reddedildi.');return localAI.request(action,data);});
   protocol.handle('katman', request => {
     const url=new URL(request.url);
     if(url.host!=='app')return new Response('Forbidden',{status:403});
@@ -42,3 +46,4 @@ app.whenReady().then(async()=>{
   app.on('activate',()=>{if(BrowserWindow.getAllWindows().length===0)createWindow();else window?.show();});
 });
 app.on('window-all-closed',()=>{if(!isMac)app.quit();});
+app.on('before-quit',()=>localAI?.cancel());

@@ -5,9 +5,14 @@ directories:
 files:
   - public/**/*
   - desktop/**/*
+  - local-ai/*.py
+  - local-ai/requirements.txt
+  - server.mjs
   - package.json
   - '!node_modules/**/*'
 asar: true
+asarUnpack:
+  - local-ai/**/*
 npmRebuild: false
 mac:
   category: public.app-category.graphics-design

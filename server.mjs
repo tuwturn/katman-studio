@@ -5,14 +5,16 @@ import path from 'node:path';
 import os from 'node:os';
 import {spawn} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
+import localModule from './desktop/local-ai.cjs';
 const root = path.resolve(fileURLToPath(new URL('./public/', import.meta.url)));
 const types = {'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.wasm':'application/wasm','.png':'image/png','.ico':'image/x-icon','.txt':'text/plain; charset=utf-8'};
 export function networkAddresses(interfaces=os.networkInterfaces()){
   const candidates=Object.entries(interfaces).flatMap(([name,addresses])=>(addresses||[]).filter(a=>a&&!a.internal&&(a.family==='IPv4'||a.family===4)&&!a.address.startsWith('169.254.')).map(a=>({address:a.address,score:Number(/^(192\.168\.|10\.)/.test(a.address))*2-Number(/virtual|vmware|vbox|vethernet|wsl|docker|tailscale|zerotier/i.test(name)||/^0[8a]:00:27:/i.test(a.mac||''))*10})));
   return [...new Set(candidates.sort((a,b)=>b.score-a.score).map(a=>a.address))];
 }
-export function createWebServer(){return http.createServer(async (req, res) => {
+export function createWebServer({ai}={}){ai??=new localModule.LocalAI({home:process.env.KATMAN_AI_HOME||path.join(process.platform==='win32'?process.env.APPDATA||path.join(os.homedir(),'AppData','Roaming'):process.platform==='darwin'?path.join(os.homedir(),'Library','Application Support'):process.env.XDG_CONFIG_HOME||path.join(os.homedir(),'.config'),'Katman Studio','Yerel-YZ'),scripts:fileURLToPath(new URL('./local-ai/',import.meta.url))});return http.createServer(async (req, res) => {
   try {
+    if(req.url.startsWith('/api/local-ai/')){const action=new URL(req.url,'http://localhost').pathname.slice('/api/local-ai/'.length);if(req.headers.origin&&req.headers.origin!==`http://${req.headers.host}`){res.writeHead(403).end('İstek kaynağı reddedildi');return;}try{let data={};if(req.method==='POST'){if(!req.headers['content-type']?.startsWith('application/json'))throw new Error('JSON isteği gerekli.');const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>4096)throw new Error('İstek çok büyük.');chunks.push(chunk);}data=JSON.parse(Buffer.concat(chunks).toString('utf8'));}else if(req.method==='GET'&&!['status','result'].includes(action))throw new Error('POST isteği gerekli.');else if(req.method!=='GET')throw new Error('Geçersiz yöntem.');if(action==='result')data.id=new URL(req.url,'http://localhost').searchParams.get('id');const value=await ai.request(action,data);res.writeHead(200,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}).end(JSON.stringify(value));}catch(error){res.writeHead(400,{'Content-Type':'application/json; charset=utf-8'}).end(JSON.stringify({error:error.message}));}return;}
     if(!['GET','HEAD'].includes(req.method)){res.writeHead(405,{'Allow':'GET, HEAD'}).end();return;}
     const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
     const file = path.resolve(root, '.' + (pathname === '/' ? '/index.html' : pathname));
