@@ -60,3 +60,7 @@ def release_device(device):
     import gc,torch
     gc.collect()
     if device.type=='cuda':torch.cuda.empty_cache()
+
+def dtype_for(device,mode='auto'):
+    import torch
+    return torch.float16 if device.type=='cuda' and mode=='auto' else torch.float32

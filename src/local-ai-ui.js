@@ -23,9 +23,9 @@ export function initLocalAI({onEdit,onModelReady}){
  function approved(){return reference&&(reference.source==='upload'?!$('ai-prompt').value.trim():$('ai-prompt').value.trim()===reference.prompt&&$('ai-language').value===reference.language);}
  function updateButtons(busy,ready){
   busy=busy||preparing;
-  lastBusy=busy;$('ai-generate').disabled=busy||!ready;$('ai-build').disabled=busy||!ready||!approved();$('ai-install').disabled=busy;$('ai-install-gpu').disabled=busy||!ready;$('ai-cancel').hidden=!busy;
+  lastBusy=busy;$('ai-generate').disabled=busy||!ready;$('ai-build').disabled=busy||!ready||!approved();$('ai-install').disabled=busy;$('ai-install-gpu').disabled=busy||!ready;$('ai-install-quality').disabled=busy||!ready;$('ai-cancel').hidden=!busy;
   for(const id of ['ai-edit','ai-export'])$(id).disabled=busy||!part||!loadedId;
-  for(const id of ['ai-prompt','ai-language','ai-height','ai-quality','ai-seed','ai-remove-background','ai-compute'])$(id).disabled=busy;
+  for(const id of ['ai-prompt','ai-language','ai-height','ai-quality','ai-seed','ai-remove-background','ai-compute','ai-precision'])$(id).disabled=busy;
   $('ai-upload').disabled=busy||!ready;$('ai-image-file').disabled=busy||!ready;
   onModelReady?.(!!part&&!!loadedId&&!busy);
  }
@@ -33,7 +33,7 @@ export function initLocalAI({onEdit,onModelReady}){
  async function poll(){
   clearTimeout(timer);
   try{
-   const state=await bridge('status');lastReady=state.ready;$('ai-engine-state').textContent=state.ready?'Yerel motor hazır · '+(state.gpu?.name||'İşlemci'):'Yeni yerel motor kurulumu gerekli';$('ai-install-gpu').hidden=!state.gpuInstallSupported;$('ai-install-gpu').textContent=state.gpu?'GPU kurulumunu doğrula':'Donanıma uygun GPU motorunu kur';$('ai-compute').querySelector('[value="gpu"]').disabled=!state.gpu;$('ai-device').textContent=(state.job?.state==='running'&&state.job?.device?'Çalışan aygıt: '+state.job.device:state.gpu?'Otomatik seçim ekran kartını kullanır.':'Otomatik seçim işlemciyi kullanır.')+(state.job?.fallback?' GPU işlemi başarısız oldu; işlemciye dönüldü.':'');if(state.hardware){const h=state.hardware;$('ai-hardware').textContent='Üretim bilgisayarı: '+h.cpu+' · '+h.ramGB+' GB RAM ('+h.freeGB+' GB boş) · '+(state.busy&&state.job?.threads||h.threads)+' iş parçacığı · '+({low:'Bellek tasarrufu',balanced:'Dengeli',high:'Yüksek bellek'}[h.memoryMode]||h.memoryMode)+(state.gpu?.memoryGB?' · '+state.gpu.memoryGB+' GB GPU':'');}updateButtons(state.busy||pending,state.ready);
+   const state=await bridge('status');lastReady=state.ready;$('ai-engine-state').textContent=state.ready?'Yerel motor hazır · '+(state.gpu?.name||'İşlemci'):'Yeni yerel motor kurulumu gerekli';$('ai-install-gpu').hidden=!state.gpuInstallSupported;$('ai-install-gpu').textContent=state.gpu?'GPU kurulumunu doğrula':'Donanıma uygun GPU motorunu kur';$('ai-compute').querySelector('[value="gpu"]').disabled=!state.gpu;$('ai-quality').querySelector('[value="fidelity"]').disabled=!state.qualityReady;$('ai-install-quality').hidden=!!state.qualityReady;$('ai-device').textContent=(state.job?.state==='running'&&state.job?.device?'Çalışan aygıt: '+state.job.device:state.gpu?'Otomatik seçim ekran kartını kullanır.':'Otomatik seçim işlemciyi kullanır.')+(state.job?.fallback?' GPU işlemi başarısız oldu; işlemciye dönüldü.':'');if(state.hardware){const h=state.hardware;$('ai-hardware').textContent='Üretim bilgisayarı: '+h.cpu+' · '+h.ramGB+' GB RAM ('+h.freeGB+' GB boş) · '+(state.busy&&state.job?.threads||h.threads)+' iş parçacığı · '+({low:'Bellek tasarrufu',balanced:'Dengeli',high:'Yüksek bellek'}[h.memoryMode]||h.memoryMode)+(state.gpu?.memoryGB?' · '+state.gpu.memoryGB+' GB GPU':'');}updateButtons(state.busy||pending,state.ready);
    const job=state.job;
    if(job?.id!==reportedJobId){reportedJobId=job?.id;localError=null;}
    if(job&&!localError){
@@ -67,8 +67,8 @@ export function initLocalAI({onEdit,onModelReady}){
   catch(e){pending=false;updateButtons(false,lastReady);error(e);return;}finally{pending=false;}
   await poll();
  }
- function options(){const rawSeed=$('ai-seed').value;return{compute:$('ai-compute').value,prompt:$('ai-prompt').value.trim(),language:$('ai-language').value,height:Number($('ai-height').value),quality:$('ai-quality').value,seed:rawSeed===''?Math.floor(Math.random()*2**31):Number(rawSeed)};}
- $('ai-install').onclick=()=>run('install');$('ai-install-gpu').onclick=()=>run('install-gpu');$('ai-cancel').onclick=async()=>{try{await bridge('cancel');await poll();}catch(e){error(e);}};
+ function options(){const rawSeed=$('ai-seed').value;return{compute:$('ai-compute').value,precision:$('ai-precision').value,prompt:$('ai-prompt').value.trim(),language:$('ai-language').value,height:Number($('ai-height').value),quality:$('ai-quality').value,seed:rawSeed===''?undefined:Number(rawSeed)};}
+ $('ai-install').onclick=()=>run('install');$('ai-install-gpu').onclick=()=>run('install-gpu');$('ai-install-quality').onclick=()=>run('install-quality');$('ai-cancel').onclick=async()=>{try{await bridge('cancel');await poll();}catch(e){error(e);}};
  $('ai-generate').onclick=()=>{const data=options();if(!data.prompt)return error(new Error('Önce üretilecek nesneyi tarif edin.'));run('concept',data);};
  async function upload(file){
   if(!file||lastBusy||pending||preparing||!lastReady)return;
@@ -76,7 +76,7 @@ export function initLocalAI({onEdit,onModelReady}){
   try{
    if(!['image/png','image/jpeg','image/webp'].includes(file.type))throw new Error('PNG, JPG veya WEBP görseli seçin.');
    if(file.size>25*1024*1024)throw new Error('Görsel en fazla 25 MB olabilir.');
-   const bitmap=await createImageBitmap(file);try{if(bitmap.width*bitmap.height>25_000_000)throw new Error('Görsel en fazla 25 milyon piksel olabilir.');const scale=Math.min(1,1024/Math.max(bitmap.width,bitmap.height)),canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);preparing=false;await run('import-image',{...options(),name:file.name,image:canvas.toDataURL('image/png'),removeBackground:$('ai-remove-background').checked});}finally{bitmap.close();}
+   const bitmap=await createImageBitmap(file);try{if(bitmap.width*bitmap.height>25_000_000)throw new Error('Görsel en fazla 25 milyon piksel olabilir.');const scale=Math.min(1,((navigator.deviceMemory||8)<=4?1024:2048)/Math.max(bitmap.width,bitmap.height)),canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);let image=canvas.toDataURL('image/png');while(image.length>10*1024*1024&&canvas.width>256&&canvas.height>256){const smaller=document.createElement('canvas');smaller.width=Math.max(1,Math.round(canvas.width*.8));smaller.height=Math.max(1,Math.round(canvas.height*.8));smaller.getContext('2d').drawImage(canvas,0,0,smaller.width,smaller.height);canvas.width=smaller.width;canvas.height=smaller.height;canvas.getContext('2d').drawImage(smaller,0,0);image=canvas.toDataURL('image/png');}preparing=false;await run('import-image',{...options(),name:file.name,image,removeBackground:$('ai-remove-background').checked});}finally{bitmap.close();}
   }catch(e){error(e);}finally{preparing=false;$('ai-image-file').value='';await poll();}
  }
  $('ai-upload').onclick=()=>$('ai-image-file').click();$('ai-image-file').onchange=e=>upload(e.target.files[0]);

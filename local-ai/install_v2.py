@@ -12,7 +12,71 @@ def file_hash(path):
         for block in iter(lambda:stream.read(4*1024*1024),b''):digest.update(block)
     return digest.hexdigest()
 
-def repo_download(repo,revision,root,patterns):
+def reuse_encoder(url,target,source,size,digest,minimum_bytes=256*1024**2):
+    """Reuse frozen encoder bytes, but accept the result only after full official SHA-256."""
+    import struct
+    from concurrent.futures import ThreadPoolExecutor,wait,FIRST_COMPLETED
+    temporary=target.with_suffix('.reuse')
+    def read_range(start,end):
+        for attempt in range(4):
+            try:
+                request=urllib.request.Request(url+f'?download=true&reuse={start}',headers={'Range':f'bytes={start}-{end}','User-Agent':'Katman-Studio-local-ai'})
+                with urllib.request.urlopen(request,timeout=120) as response:
+                    if response.status!=206 or response.headers.get('Content-Range')!=f'bytes {start}-{end}/{size}':raise RuntimeError('Ağırlık aralığı doğrulanamadı.')
+                    data=response.read(end-start+1)
+                    if len(data)!=end-start+1:raise RuntimeError('Ağırlık aralığı eksik.')
+                    return data
+            except Exception:
+                if attempt==3:raise
+                time.sleep(1)
+    try:
+        first=read_range(0,7);length=struct.unpack('<Q',first)[0]
+        if length>4*1024**2:return False
+        header=read_range(8,7+length);index=json.loads(header);offset=8+length
+        with source.open('rb') as local:
+            source_length=struct.unpack('<Q',local.read(8))[0];source_index=json.loads(local.read(source_length));source_offset=8+source_length
+            target.parent.mkdir(parents=True,exist_ok=True)
+            with temporary.open('wb') as out:
+                out.truncate(size);out.write(first+header);missing=[];reused=0
+                for name,entry in index.items():
+                    if name=='__metadata__':continue
+                    start,end=entry['data_offsets'];other=source_index.get(name)
+                    if name.startswith('conditioner.') and other and other['shape']==entry['shape'] and other['dtype']==entry['dtype']:
+                        local.seek(source_offset+other['data_offsets'][0]);out.seek(offset+start);remaining=end-start
+                        while remaining:
+                            block=local.read(min(4*1024**2,remaining))
+                            if not block:raise RuntimeError('Yerel ağırlık eksik.')
+                            out.write(block);remaining-=len(block)
+                        reused+=end-start
+                    else:missing.append((offset+start,offset+end-1))
+                if reused<minimum_bytes:return False
+                merged=[]
+                for start,end in sorted(missing):
+                    if merged and merged[-1][1]+1==start:merged[-1]=(merged[-1][0],end)
+                    else:merged.append((start,end))
+                ranges=[(start,min(start+16*1024**2-1,end)) for left,end in merged for start in range(left,end+1,16*1024**2)]
+                report('Mevcut görsel kodlayıcı ağırlıkları yeniden kullanılıyor; kalan kalite ağırlıkları indiriliyor…')
+                received=offset+reused
+                with ThreadPoolExecutor(max_workers=4) as pool:
+                    remaining=iter(ranges);pending={}
+                    for pair in [next(remaining,None) for _ in range(4)]:
+                        if pair:pending[pool.submit(read_range,*pair)]=pair
+                    while pending:
+                        done,_=wait(pending,return_when=FIRST_COMPLETED)
+                        for future in done:
+                            start,end=pending.pop(future);out.seek(start);block=future.result();out.write(block);received+=len(block)
+                            report(f'Kalite modeli hazırlanıyor · %{min(99,int(received*100/size))}',progress=min(99,int(received*100/size)))
+                            pair=next(remaining,None)
+                            if pair:pending[pool.submit(read_range,*pair)]=pair
+        if file_hash(temporary)!=digest:
+            report('Ortak ağırlıklar farklı; modelin tamamı normal indirme ile doğrulanacak.');return False
+        temporary.replace(target);return True
+    except Exception as error:
+        report('Ortak ağırlık kısayolu kullanılamadı; normal indirmeye dönülüyor.');return False
+    finally:temporary.unlink(missing_ok=True)
+
+
+def repo_download(repo,revision,root,patterns,reuse=False):
     from huggingface_hub import HfApi
     from concurrent.futures import ThreadPoolExecutor
     info=HfApi().model_info(repo,revision=revision,files_metadata=True)
@@ -22,7 +86,16 @@ def repo_download(repo,revision,root,patterns):
         url=f'https://huggingface.co/{repo}/resolve/{revision}/{name}'
         if not digest or size<16*1024*1024:
             return download(url,target,digest)
-        if target.exists() and target.stat().st_size==size and file_hash(target)==digest:return
+        if target.exists() and target.stat().st_size==size and file_hash(target)==digest:
+            target.with_suffix(target.suffix+'.part').unlink(missing_ok=True);return
+        if reuse:
+            source=root / name.replace('hunyuan3d-dit-v2-mini/','hunyuan3d-dit-v2-mini-turbo/').replace('hunyuan3d-vae-v2-mini/','hunyuan3d-vae-v2-mini-turbo/')
+            if source!=target and source.exists():
+                if source.stat().st_size==size and file_hash(source)==digest:
+                    target.parent.mkdir(parents=True,exist_ok=True);copy=target.with_suffix('.copy');shutil.copyfile(source,copy);copy.replace(target)
+                    target.with_suffix(target.suffix+'.part').unlink(missing_ok=True);return
+                if 'hunyuan3d-dit-v2-mini/' in name and reuse_encoder(url,target,source,size,digest):
+                    target.with_suffix(target.suffix+'.part').unlink(missing_ok=True);return
         target.parent.mkdir(parents=True,exist_ok=True);partial=target.with_suffix(target.suffix+'.part')
         # Preserve useful partial data from an interrupted Hugging Face download.
         cache=root / '.cache' / 'huggingface' / 'download' / pathlib.Path(name).parent
@@ -99,10 +172,18 @@ def install(home):
     with zipfile.ZipFile(archive) as files:files.extractall(vendor)
     run([str(python),str(pathlib.Path(__file__).resolve()),'--home',str(home),'--models'])
 
+def quality_models(home):
+    report('Ayrı Mini kalite motoru indiriliyor · yaklaşık 4 GB…')
+    repo_download('tencent/Hunyuan3D-2mini',SHAPE,home/'models-v2'/'shape',[
+        'hunyuan3d-dit-v2-mini/config.yaml','hunyuan3d-dit-v2-mini/model.fp16.safetensors',
+        'hunyuan3d-vae-v2-mini/config.yaml','hunyuan3d-vae-v2-mini/model.fp16.safetensors'],reuse=True)
+    report('Mini kalite motoru hazır. API olmadan yerel çalışır.',ready=True)
+
 if __name__=='__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('--home',required=True);parser.add_argument('--models',action='store_true');args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--home',required=True);parser.add_argument('--models',action='store_true');parser.add_argument('--quality-models',action='store_true');args=parser.parse_args()
     try:
         home=pathlib.Path(args.home).resolve()
-        if args.models:models(home)
+        if args.quality_models:quality_models(home)
+        elif args.models:models(home)
         else:install(home)
     except Exception as error:report(str(error),error=True);raise

@@ -3,6 +3,24 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {createWebServer} from '../server.mjs';
 const require=createRequire(import.meta.url),{validatePrompt,validateImage,LocalAI}=require('../desktop/local-ai.cjs');
+test('height changes retain the reference variation and fidelity requires a separate installed model',async()=>{
+ const engine=new LocalAI({home:process.cwd()+'/test-results/not-installed-ai',scripts:process.cwd()+'/local-ai'});engine.ready=()=>true;engine.gpu=()=>null;engine.reference={id:'12345678-abcd-1234-abcd-123456789012',prompt:'Approved teapot',seed:42,language:'en'};
+ let input;engine.launch=(_kind,_python,_args,value)=>input=value;
+ await engine.generate({referenceId:engine.reference.id,height:150});assert.equal(input.seed,42);assert.equal(input.height,150);
+ engine.job={kind:'generate',referenceId:engine.reference.id,seed:43};await engine.generate({referenceId:engine.reference.id,height:75});assert.equal(input.seed,43);
+ await assert.rejects(engine.generate({referenceId:engine.reference.id,quality:'fidelity'}),/Mini motorunu kurun/);
+ engine.qualityReady=()=>true;await engine.generate({referenceId:engine.reference.id,quality:'fidelity',seed:44});assert.equal(input.quality,'fidelity');assert.equal(input.seed,44);
+});
+test('automatic precision retries the same GPU at float32 before CPU fallback',async()=>{
+ const {mkdtemp,writeFile,readFile,rm}=await import('node:fs/promises'),{tmpdir}=await import('node:os'),path=await import('node:path');const folder=await mkdtemp(path.join(tmpdir(),'katman-precision-'));
+ try{
+  const file=path.join(folder,'gpu.cjs'),log=path.join(folder,'attempts.jsonl');
+  await writeFile(file,"let data='';process.stdin.on('data',c=>data+=c);process.stdin.on('end',()=>{const job=JSON.parse(data);require('fs').appendFileSync(process.argv[2],JSON.stringify(job)+'\\n');if(job.precision==='auto')process.exit(1);console.log(JSON.stringify({precision:'float32'}));})");
+  const engine=new LocalAI({home:folder,scripts:folder});engine.launch('benchmark',process.execPath,[file,log],{action:'generate',backend:'cuda',precision:'auto',compute:'auto',seed:42,height:100,referenceId:'exact-reference'});
+  const start=Date.now();while(engine.child){assert(Date.now()-start<10000);await new Promise(r=>setTimeout(r,20));}
+  const attempts=(await readFile(log,'utf8')).trim().split('\n').map(JSON.parse);assert.equal(attempts.length,2);assert.equal(attempts[1].backend,'cuda');assert.equal(attempts[1].precision,'float32');assert.equal(attempts[1].seed,42);assert.equal(attempts[1].referenceId,'exact-reference');assert.equal(engine.job.state,'succeeded');
+ }finally{await rm(folder,{recursive:true,force:true});}
+});
 test('GPU selection defaults to verified adapter, supports CPU override and rejects unavailable GPU',async()=>{
  const engine=new LocalAI({home:process.cwd()+'/test-results/not-installed-ai',scripts:process.cwd()+'/local-ai'});engine.ready=()=>true;engine.gpu=()=>null;
  assert.equal(engine.compute({}).backend,'cpu');assert.throws(()=>engine.compute({compute:'gpu'}),/kurun/);assert.throws(()=>engine.compute({compute:'bogus'}),/Geçersiz/);
@@ -17,7 +35,7 @@ test('automatic GPU failure retries the exact input once on CPU; forced GPU and 
   await writeFile(path.join(folder,'generate_v2.py'),"process.stdin.resume();process.stdin.on('end',()=>console.log(JSON.stringify({message:'CPU completed',device:'İşlemci'})))");
  for(const mode of ['auto','gpu','cancel','cuda']){
    const engine=new LocalAI({home:folder,scripts:folder});engine.python=()=>process.execPath;
-   engine.launch('benchmark',process.execPath,['-e',"process.stdin.resume();setTimeout(()=>{console.error('GPU memory test failure');process.exit(1)},100)"],{backend:mode==='cuda'?'cuda':'rocm',compute:['cancel','cuda'].includes(mode)?'auto':mode,action:'generate',seed:42,referenceId:'approved-reference',height:100});
+   engine.launch('benchmark',process.execPath,['-e',"process.stdin.resume();setTimeout(()=>{console.log(JSON.stringify({error:true,message:'GPU memory test failure'}));console.error('GPU memory test failure');process.exit(1)},100)"],{backend:mode==='cuda'?'cuda':'rocm',compute:['cancel','cuda'].includes(mode)?'auto':mode,action:'generate',seed:42,referenceId:'approved-reference',height:100});
    if(mode==='cancel')engine.job.state='cancelled';
    const start=Date.now();while(engine.child){assert(Date.now()-start<10000);await new Promise(r=>setTimeout(r,20));}
    if(['auto','cuda'].includes(mode)){assert.equal(engine.job.state,'succeeded');assert.equal(engine.job.backend,'cpu');assert.equal(engine.job.seed,42);assert.equal(engine.job.referenceId,'approved-reference');assert.match(engine.job.fallback,/GPU memory/);assert.match(engine.job.message,/işlemci/);}

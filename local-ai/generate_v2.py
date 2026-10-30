@@ -1,6 +1,8 @@
 """Offline, two-stage free text -> approved concept -> real 3D geometry."""
-import gc, json, os, pathlib, socket, sys, time
-from install_v2 import SOURCE
+import gc, json, os, pathlib, socket, sys, time, hashlib
+from install_v2 import SOURCE,SHAPE,IMAGE
+from production_cache import ProductionCache,key_for,file_identity
+from reference_image import FaithfulImageProcessor
 
 def report(message, **extra):
     print(json.dumps({'message':message,**extra}),flush=True)
@@ -35,13 +37,33 @@ def translate(home,job):
     return prompt
 
 def concept(home,job,output):
+    import numpy as np
+    from PIL import Image as PILImage
+    model=home/'models-v2'/'image'
+    identity=[IMAGE,*[file_identity(model/folder/name) for folder,name in [('unet','diffusion_pytorch_model.fp16.safetensors'),('vae','diffusion_pytorch_model.fp16.safetensors'),('text_encoder','model.fp16.safetensors')]]]
+    concept_key=key_for('concept',identity,job['prompt'],job.get('language','tr'),job['seed'],job.get('backend','cpu'),job.get('precision','auto'),job.get('runtime',{}))
+    cache=ProductionCache(home,job.get('resources',{}).get('memoryMode','balanced'))
+    cached=cache.load(concept_key)
+    if cached is not None:
+        try:
+            metadata=json.loads(cached['metadata'].tobytes().decode('utf-8'))
+            if metadata['prompt']!=job['prompt'] or metadata['seed']!=job['seed']:raise ValueError('cache metadata')
+            for name in ['concept','reference']:
+                array=cached[name]
+                if array.dtype!=np.uint8 or array.ndim!=3 or array.shape[-1] not in [3,4] or max(array.shape[:2])>1024:raise ValueError('cache image')
+                PILImage.fromarray(array).save(output/(name+'.png'))
+            (output/'concept.json').write_text(json.dumps(metadata,ensure_ascii=False),encoding='utf-8')
+            report('Saklanan kontrol görseli hazır; yeniden görsel üretilmedi.',phase='concept-ready',translated=metadata['translated'],cache='concept',device='Önbellek · yeni YZ hesaplaması yok');return
+        except (KeyError,ValueError,UnicodeError):pass
     import torch
     from diffusers import StableDiffusionPipeline
+    from gpu_runtime import dtype_for,release_device
+    init_compute(job)
     prompt=translate(home,job)
     # Presentation only; no object names or predefined shapes are added.
     image_prompt=f'{prompt}, single complete object, full body, isolated on a plain white background, 3D sculpture, studio product photograph'
     report('Tariften kontrol görseli üretiliyor…',phase='concept',translated=prompt)
-    pipe=StableDiffusionPipeline.from_pretrained(str(home / 'models-v2' / 'image'),variant='fp16',torch_dtype=torch.float32,local_files_only=True)
+    pipe=StableDiffusionPipeline.from_pretrained(str(home / 'models-v2' / 'image'),variant='fp16',torch_dtype=dtype_for(job['_device'],job.get('precision','auto')),local_files_only=True)
     device=job.get('_device',torch.device('cpu'))
     if device.type=='cuda' and torch.cuda.mem_get_info(device)[0]<6*1024**3:
         pipe.enable_model_cpu_offload(gpu_id=device.index);pipe.enable_vae_tiling()
@@ -55,7 +77,7 @@ def concept(home,job,output):
     with torch.inference_mode():
         image=pipe(image_prompt,num_inference_steps=4,guidance_scale=0.0,height=512,width=512,generator=torch.Generator('cpu').manual_seed(job['seed']),callback_on_step_end=progress).images[0]
     image.save(output / 'concept.png')
-    del pipe;gc.collect()
+    del pipe;release_device(device)
     report('Görselin arka planı ayrılıyor…',phase='background')
     from rembg import remove,new_session
     session=new_session('u2netp',providers=['CPUExecutionProvider'])
@@ -66,6 +88,7 @@ def concept(home,job,output):
     rgba.save(output / 'reference.png')
     metadata={'prompt':job['prompt'],'translated':prompt,'image_prompt':image_prompt,'seed':job['seed'],'language':job.get('language','tr')}
     (output / 'concept.json').write_text(json.dumps(metadata,ensure_ascii=False),encoding='utf-8')
+    cache.save(concept_key,concept=np.asarray(image),reference=np.asarray(rgba),metadata=np.frombuffer(json.dumps(metadata,ensure_ascii=False).encode('utf-8'),dtype=np.uint8))
     report('Kontrol görseli hazır. Doğru görünüyorsa onaylayıp 3D üretin.',phase='concept-ready',translated=prompt)
 
 def import_image(home,job,output):
@@ -80,13 +103,20 @@ def import_image(home,job,output):
         if original.format not in ['PNG','JPEG','WEBP']:raise RuntimeError('PNG, JPG veya WEBP görseli gerekli.')
         if original.width*original.height>25_000_000:raise RuntimeError('Görsel en fazla 25 milyon piksel olabilir.')
         image=ImageOps.exif_transpose(original).convert('RGBA')
-    image.thumbnail((1024,1024),Image.Resampling.LANCZOS)
+    image.thumbnail((1024,1024) if job.get('resources',{}).get('memoryMode')=='low' else (2048,2048),Image.Resampling.LANCZOS)
     image.save(output / 'concept.png')
     # Existing transparency is meaningful; do not run segmentation on it again.
     if job.get('removeBackground',True) and image.getchannel('A').getextrema()==(255,255):
         report('Yüklenen görselin arka planı ayrılıyor…',phase='background')
-        from rembg import remove,new_session
-        image=remove(image,session=new_session('u2netp',providers=['CPUExecutionProvider']))
+        cache=ProductionCache(home,job.get('resources',{}).get('memoryMode','balanced'))
+        background_key=key_for('background',hashlib.sha256(image.tobytes()).hexdigest(),image.size,file_identity(home/'models-v2/background/u2netp.onnx'))
+        saved=cache.load(background_key)
+        if saved is not None and saved.get('rgba',np.empty(0)).shape==(image.height,image.width,4) and saved['rgba'].dtype==np.uint8:
+            image=Image.fromarray(saved['rgba']);report('Saklanan arka plan ayrımı kullanılıyor.',phase='background',cache='background')
+        else:
+            from rembg import remove,new_session
+            image=remove(image,session=new_session('u2netp',providers=['CPUExecutionProvider']))
+            if (np.asarray(image.getchannel('A'))>128).sum()>=64:cache.save(background_key,rgba=np.asarray(image))
     if (np.asarray(image.getchannel('A'))>128).sum()<64:raise RuntimeError('Görselde yeterli görünür nesne kalmadı. Arka plan ayırmayı kapatarak yeniden yükleyin.')
     image.save(output / 'reference.png')
     metadata={'prompt':job['prompt'],'translated':'','seed':job['seed'],'language':'en','source':'upload','removeBackground':job.get('removeBackground',True)}
@@ -94,82 +124,114 @@ def import_image(home,job,output):
     report('Yüklenen görsel hazır. Doğruysa onaylayıp 3D üretin.',phase='concept-ready',translated='')
 
 def mesh(home,job,output):
-    import torch,numpy as np
+    import numpy as np
     from PIL import Image
-    sys.path.insert(0,str(home / 'vendor' / f'Hunyuan3D-2-{SOURCE}'))
+    reference=home/'jobs'/job['referenceId'];metadata=json.loads((reference/'concept.json').read_text(encoding='utf-8'))
+    image=Image.open(reference/'reference.png').convert('RGBA')
+    fidelity=job.get('quality')=='fidelity';suffix='' if fidelity else '-turbo'
+    folder=home/'models-v2'/'shape'/('hunyuan3d-dit-v2-mini'+suffix)
+    vae_folder=folder.parent/('hunyuan3d-vae-v2-mini'+suffix)
+    if not (folder/'model.fp16.safetensors').exists():raise RuntimeError('Önce alternatif Mini motorunu kurun.')
+    identity=[SOURCE,SHAPE,file_identity(folder/'model.fp16.safetensors'),file_identity(folder/'config.yaml')]
+    image_key=key_for(hashlib.sha256((reference/'reference.png').read_bytes()).hexdigest(),identity,job.get('backend','cpu'),job.get('precision','auto'),job.get('runtime',{}))
+    latent_key=key_for('latent',image_key,job['seed'],30 if fidelity else 5)
+    resolution=256 if fidelity or job.get('steps')!=32 else 192
+    surface_key=key_for('surface',latent_key,resolution,file_identity(vae_folder/'model.fp16.safetensors'))
+    cache=ProductionCache(home,job.get('resources',{}).get('memoryMode','balanced'))
+    surface=cache.load(surface_key)
+    if surface is not None and valid_surface(surface):
+        report('Saklanan 3D yüzey kullanılıyor; model yeniden üretilmiyor.',phase='cache',cache='surface',device='Önbellek · işlemciyle çıktı hazırlama',precision='cache')
+        finish_mesh(surface['vertices'],surface['faces'],metadata,job,output);return
+    init_compute(job)
+    import torch,yaml
+    from gpu_runtime import release_device,stage_device,dtype_for
+    from accelerate import init_empty_weights
+    from safetensors import safe_open
+    sys.path.insert(0,str(home/'vendor'/f'Hunyuan3D-2-{SOURCE}'))
     from hy3dgen.shapegen import Hunyuan3DDiTFlowMatchingPipeline
     from hy3dgen.shapegen.pipelines import instantiate_from_config,export_to_trimesh
     from hy3dgen.shapegen.models.autoencoders import ShapeVAE
-    from safetensors import safe_open
-    import yaml
-    from gpu_runtime import release_device,stage_device
-    from accelerate import init_empty_weights
-    device=job.get('_device',torch.device('cpu'))
-    reference=home / 'jobs' / job['referenceId']
-    metadata=json.loads((reference / 'concept.json').read_text(encoding='utf-8'))
-    image=Image.open(reference / 'reference.png').convert('RGBA')
-    report('Onaylanan görselden yerel 3D modeli yükleniyor…',phase='load',translated=metadata['translated'])
-    folder=home / 'models-v2' / 'shape' / 'hunyuan3d-dit-v2-mini-turbo'
-    config=yaml.safe_load((folder / 'config.yaml').read_text(encoding='utf-8'))
+    device=job['_device'];config=yaml.safe_load((folder/'config.yaml').read_text(encoding='utf-8'))
+    processor=FaithfulImageProcessor(**config['image_processor']['params'])
     def component(name):
-        # Load and release one component at a time instead of keeping the giant
-        # image encoder, diffusion model and decoder resident simultaneously.
         with init_empty_weights():module=instantiate_from_config(config[name])
-        with safe_open(str(folder / 'model.fp16.safetensors'),framework='pt',device='cpu') as weights:
+        with safe_open(str(folder/'model.fp16.safetensors'),framework='pt',device='cpu') as weights:
             prefix=name+'.';state={key[len(prefix):]:weights.get_tensor(key) for key in weights.keys() if key.startswith(prefix)}
             module.load_state_dict(state,strict=True,assign=True)
         del state
-        target=stage_device(device,sum(p.numel()*4 for p in module.parameters()))
-        report(('GPU' if target.type=='cuda' else 'İşlemci')+' · '+name+' yükleniyor',phase='load',device=torch.cuda.get_device_name(target) if target.type=='cuda' else 'İşlemci')
-        return module.eval().to(device=target,dtype=torch.float32)
-    processor=instantiate_from_config(config['image_processor'])
-    report('Onaylanan görselin 3D özellikleri çıkarılıyor…',phase='encode')
-    conditioner=component('conditioner')
-    layers=conditioner.main_image_encoder.model.encoder.layer
-    for number,layer in enumerate(layers,1):
-        if number%5==0 or number==len(layers):
-            layer.register_forward_hook(lambda _m,_a,_o,n=number:report(f'Görselin 3D özellikleri çözümleniyor · {n}/{len(layers)}',phase='encode'))
-    encoder_device=next(conditioner.parameters()).device
-    inputs={key:value.to(encoder_device) if isinstance(value,torch.Tensor) else value for key,value in processor(image).items()}
-    with torch.inference_mode():embedding=conditioner(**inputs)['main']
-    del conditioner,inputs,layers,layer;release_device(device)
-    class CachedConditioner(torch.nn.Module):
-        def __init__(self,value):super().__init__();self.register_buffer('value',value)
-        def forward(self,**kwargs):return {'main':self.value}
-    class LatentShape(torch.nn.Module):
-        latent_shape=(config['vae']['params']['num_latents'],config['vae']['params']['embed_dim'])
-    model=component('model')
-    model_device=next(model.parameters()).device;embedding=embedding.to(model_device)
-    scheduler=instantiate_from_config(config['scheduler'])
-    pipeline=Hunyuan3DDiTFlowMatchingPipeline(vae=LatentShape(),model=model,scheduler=scheduler,conditioner=CachedConditioner(embedding),image_processor=processor,device=model_device,dtype=torch.float32)
-    steps=5
-    def progress(step,*args):report(f'Onaylanan görselden 3D biçim üretiliyor · {step+1}/{steps}',phase='sample',progress=(step+1)*100/steps)
-    with torch.inference_mode():
-        latents=pipeline(image=image,num_inference_steps=steps,guidance_scale=5.0,output_type='latent',generator=torch.Generator('cpu').manual_seed(job['seed']),callback=progress,callback_steps=1,enable_pbar=False)
-    del pipeline,model,embedding;release_device(device)
-    report('3D yüzey çıkarılıyor…',phase='decode')
-    vae_folder=folder.parent / 'hunyuan3d-vae-v2-mini-turbo'
+        dtype=dtype_for(device,job.get('precision','auto'))
+        target=stage_device(device,sum(p.numel()*(2 if dtype==torch.float16 else 4) for p in module.parameters()))
+        dtype=dtype_for(target,job.get('precision','auto'))
+        report(('GPU' if target.type=='cuda' else 'İşlemci')+' · '+name+' yükleniyor',phase='load',device=torch.cuda.get_device_name(target) if target.type=='cuda' else 'İşlemci',precision=str(dtype).split('.')[-1])
+        return module.eval().to(device=target,dtype=dtype)
+    saved=cache.load(latent_key)
+    if saved is not None and saved.get('latents',np.empty(0)).shape==(1,config['vae']['params']['num_latents'],config['vae']['params']['embed_dim']):
+        latents=torch.from_numpy(saved['latents']);report('Saklanan 3D biçimden yeni ayrıntı yüzeyi çıkarılıyor.',phase='cache',cache='latent')
+    else:
+        encoded=cache.load(image_key)
+        if encoded is not None and encoded.get('embedding',np.empty(0)).ndim==3 and encoded['embedding'].shape[-1]==1536:
+            embedding=torch.from_numpy(encoded['embedding']);report('Görsel özellikleri yeniden kullanılıyor.',phase='cache',cache='embedding')
+        else:
+            conditioner=component('conditioner');encoder_device=next(conditioner.parameters()).device
+            inputs={key:value.to(encoder_device,dtype=next(conditioner.parameters()).dtype) if isinstance(value,torch.Tensor) else value for key,value in processor(image).items()}
+            report('Görselin 3D özellikleri çıkarılıyor…',phase='encode')
+            with torch.inference_mode():embedding=conditioner(**inputs)['main']
+            if not torch.isfinite(embedding).all():raise RuntimeError('Görsel kodlayıcısında sayısal taşma oluştu.')
+            cache.save(image_key,embedding=embedding.detach().cpu().numpy())
+            del conditioner,inputs;release_device(device)
+        class CachedConditioner(torch.nn.Module):
+            def __init__(self,value):super().__init__();self.register_buffer('value',value)
+            def forward(self,**kwargs):return {'main':self.value}
+            def unconditional_embedding(self,batch_size,**kwargs):return {'main':torch.zeros_like(self.value[:batch_size])}
+        class LatentShape(torch.nn.Module):
+            latent_shape=(config['vae']['params']['num_latents'],config['vae']['params']['embed_dim'])
+        model=component('model');parameter=next(model.parameters());model_device=parameter.device;embedding=embedding.to(device=model_device,dtype=parameter.dtype)
+        pipeline=Hunyuan3DDiTFlowMatchingPipeline(vae=LatentShape(),model=model,scheduler=instantiate_from_config(config['scheduler']),conditioner=CachedConditioner(embedding),image_processor=processor,device=model_device,dtype=parameter.dtype)
+        steps=30 if fidelity else 5
+        def progress(step,*args):report(f'Görselden 3D biçim üretiliyor · {step+1}/{steps}',phase='sample',progress=(step+1)*100/steps)
+        with torch.inference_mode():latents=pipeline(image=image,num_inference_steps=steps,guidance_scale=5.0,output_type='latent',generator=torch.Generator('cpu').manual_seed(job['seed']),callback=progress,callback_steps=1,enable_pbar=False)
+        if not torch.isfinite(latents).all():raise RuntimeError('3D üretiminde sayısal taşma oluştu.')
+        cache.save(latent_key,latents=latents.detach().cpu().numpy())
+        del pipeline,model,embedding,parameter;release_device(device)
     decoder_device=stage_device(device,2*1024**3)
     report('3D yüzey çözücüsü: '+('GPU' if decoder_device.type=='cuda' else 'İşlemci'),phase='decode',device=torch.cuda.get_device_name(decoder_device) if decoder_device.type=='cuda' else 'İşlemci')
-    latents=latents.to(decoder_device)
-    vae=ShapeVAE.from_single_file(str(vae_folder / 'model.fp16.safetensors'),str(vae_folder / 'config.yaml'),device=decoder_device,dtype=torch.float32,use_safetensors=True).eval()
+    # Keep surface decoding FP32 even with FP16 sampling to protect small details.
+    latents=latents.to(device=decoder_device,dtype=torch.float32)
+    vae=ShapeVAE.from_single_file(str(vae_folder/'model.fp16.safetensors'),str(vae_folder/'config.yaml'),device=decoder_device,dtype=torch.float32,use_safetensors=True).eval()
     vae.enable_flashvdm_decoder(adaptive_kv_selection=True,topk_mode='mean',mc_algo='mc')
-    chunks=[0];last_report=[0.]
-    def decoding_progress(*_):
-        chunks[0]+=1
-        if time.monotonic()-last_report[0]>2:
-            last_report[0]=time.monotonic();report(f'3D yüzey çıkarılıyor · {chunks[0]} bölge hesaplandı',phase='decode')
-    vae.geo_decoder.register_forward_hook(decoding_progress)
-    resolution=192 if job.get('steps')==32 else 256
     with torch.inference_mode():
         decoded=vae(latents/vae.scale_factor)
         shape=export_to_trimesh(vae.latents2mesh(decoded,bounds=1.01,mc_level=0.,num_chunks=job.get('resources',{}).get('decodeChunks',2048),octree_resolution=resolution,enable_pbar=False))[0]
-    if shape is None:raise RuntimeError('Model yüzeyi çıkarılamadı. Başka bir kontrol görseli deneyin.')
+    if shape is None:raise RuntimeError('Model yüzeyi çıkarılamadı. Başka bir görsel deneyin.')
+    surface={'vertices':np.asarray(shape.vertices,dtype=np.float64),'faces':np.asarray(shape.faces,dtype=np.int64)}
+    if not valid_surface(surface):raise RuntimeError('Geçerli bir 3D yüzey oluşmadı.')
+    # Commit geometry only after cleanup/output also succeeds.
+    finish_mesh(surface['vertices'],surface['faces'],metadata,job,output)
+    cache.save(surface_key,**surface)
+
+
+def valid_surface(surface):
+    import numpy as np
+    v=surface.get('vertices',np.empty(0));f=surface.get('faces',np.empty(0))
+    return v.ndim==2 and v.shape[1]==3 and len(v)>3 and f.ndim==2 and f.shape[1]==3 and len(f)>3 and f.dtype.kind in 'iu' and f.min()>=0 and f.max()<len(v) and np.isfinite(v).all()
+
+
+def init_compute(job):
+    if '_device' in job:return
+    import torch
+    from gpu_runtime import device_for
+    resources=job.get('resources',{});threads=max(1,min(12,int(resources.get('threads',max(1,min(4,(os.cpu_count() or 2)//2))))))
+    torch.set_num_threads(threads);job['_device'],name=device_for(job.get('backend','cpu'))
+    report('Hesaplama aygıtı: '+name,phase='device',device=name,backend=job.get('backend','cpu'),threads=threads,memoryMode=resources.get('memoryMode','balanced'))
+
+
+def finish_mesh(vertices,faces,metadata,job,output):
+    import numpy as np
     report('3D yüzey uygulamaya hazırlanıyor…',phase='mesh')
-    vertices=np.asarray(shape.vertices,dtype=np.float64)
+    vertices=np.asarray(vertices,dtype=np.float64)
     # Hunyuan is Y-up, Katman Studio uses Z-up. This rotation preserves winding.
     vertices=vertices[:,[0,2,1]]*np.array([1,-1,1])
-    faces=np.asarray(shape.faces,dtype=np.int64)
+    faces=np.asarray(faces,dtype=np.int64)
     low=vertices.min(axis=0);high=vertices.max(axis=0);height=high[2]-low[2]
     if len(faces)<4 or height<1e-6 or not np.isfinite(vertices).all():raise RuntimeError('Geçerli bir 3D yüzey oluşmadı.')
     vertices=(vertices-np.array([(low[0]+high[0])/2,(low[1]+high[1])/2,low[2]]))*(float(job['height'])/height)
@@ -192,12 +254,6 @@ def main():
     try:lock.acquire(timeout=0)
     except Timeout:raise RuntimeError('Yerel motor başka bir pencerede veya ağ istemcisinde çalışıyor. Önce o işlemi tamamlayın.')
     try:
-        if job['action']!='upload':
-            import torch
-            torch.set_num_threads(threads)
-            from gpu_runtime import device_for
-            job['_device'],device_name=device_for(job.get('backend','cpu'))
-            report('Hesaplama aygıtı: '+device_name,phase='device',device=device_name,backend=job.get('backend','cpu'),threads=threads,memoryMode=resources.get('memoryMode','balanced'),deviceMemoryGB=round(torch.cuda.get_device_properties(job['_device']).total_memory/1024**3,2) if job['_device'].type=='cuda' else None)
         output=home / 'jobs' / job['id'];output.mkdir(parents=True,exist_ok=True)
         if job['action']=='concept':concept(home,job,output)
         elif job['action']=='upload':import_image(home,job,output)
