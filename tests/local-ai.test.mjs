@@ -2,7 +2,18 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {createWebServer} from '../server.mjs';
-const require=createRequire(import.meta.url),{validatePrompt,LocalAI}=require('../desktop/local-ai.cjs');
+const require=createRequire(import.meta.url),{validatePrompt,validateImage,LocalAI}=require('../desktop/local-ai.cjs');
+test('image uploads accept only bounded image data and bypass text-to-image generation',async()=>{
+ const image='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLttAAAAABJRU5ErkJggg==';
+ assert.equal(validateImage({image,name:'C:\\fakepath\\My image.png'}).prompt,'My image');
+ for(const value of [{image:'https://example.com/image.png'},{image:'data:image/png;base64,YWJjZA=='},{image:'data:text/html;base64,YWJjZA=='},{image:'data:image/png;base64,'+'A'.repeat(13*1024*1024)}])assert.throws(()=>validateImage(value));
+ const engine=new LocalAI({home:process.cwd()+'/test-results/not-installed-ai',scripts:process.cwd()+'/local-ai'});engine.ready=()=>true;let launched;engine.launch=(kind,_python,_args,input)=>launched={kind,input};
+ await engine.request('import-image',{image,name:'Photo.png',removeBackground:false,seed:1});assert.equal(launched.kind,'concept');assert.equal(launched.input.action,'upload');assert.equal(launched.input.source,'upload');assert.equal(launched.input.prompt,'Photo');assert.equal(launched.input.removeBackground,false);assert(!launched.input.image.startsWith('data:'));
+});
+test('LAN image transport accepts image-sized JSON while ordinary commands keep their small limit',async()=>{
+ let received;const ai={request:async(action,data)=>{assert.equal(action,'import-image');received=data;return{ready:true};}},server=createWebServer({ai});await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin='http://127.0.0.1:'+server.address().port,body=JSON.stringify({image:'x'.repeat(6000),name:'Transport fixture'});
+ try{const response=await fetch(origin+'/api/local-ai/import-image',{method:'POST',headers:{'Content-Type':'application/json',Origin:origin},body});assert.equal(response.status,200);assert.equal(received.image.length,6000);assert.equal((await fetch(origin+'/api/local-ai/concept',{method:'POST',headers:{'Content-Type':'application/json',Origin:origin},body})).status,400);}finally{await new Promise(r=>server.close(r));}
+});
 test('local prompts validate size, height, variation and quality without shell interpolation',()=>{
  const value=validatePrompt({prompt:'Şapka takan ördek',height:100,seed:42,quality:'draft'});assert.equal(value.steps,32);assert.equal(value.language,'tr');assert.equal(validatePrompt({prompt:'duck',language:'en',height:250,seed:1}).steps,64);for(const input of [{prompt:''},{prompt:'x'.repeat(601)},{prompt:'duck',height:0},{prompt:'duck',height:251},{prompt:'duck',seed:-1},{prompt:'duck',seed:1.5}])assert.throws(()=>validatePrompt(input));
 });

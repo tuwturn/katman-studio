@@ -64,6 +64,31 @@ def concept(home,job,output):
     (output / 'concept.json').write_text(json.dumps(metadata,ensure_ascii=False),encoding='utf-8')
     report('Kontrol görseli hazır. Doğru görünüyorsa onaylayıp 3D üretin.',phase='concept-ready',translated=prompt)
 
+def import_image(home,job,output):
+    import base64,io,warnings
+    import numpy as np
+    from PIL import Image,ImageOps
+    Image.MAX_IMAGE_PIXELS=25_000_000
+    report('Yüklediğin görsel hazırlanıyor…',phase='image',translated='')
+    with warnings.catch_warnings():
+        warnings.simplefilter('error',Image.DecompressionBombWarning)
+        original=Image.open(io.BytesIO(base64.b64decode(job['image'],validate=True)))
+        if original.format not in ['PNG','JPEG','WEBP']:raise RuntimeError('PNG, JPG veya WEBP görseli gerekli.')
+        if original.width*original.height>25_000_000:raise RuntimeError('Görsel en fazla 25 milyon piksel olabilir.')
+        image=ImageOps.exif_transpose(original).convert('RGBA')
+    image.thumbnail((1024,1024),Image.Resampling.LANCZOS)
+    image.save(output / 'concept.png')
+    # Existing transparency is meaningful; do not run segmentation on it again.
+    if job.get('removeBackground',True) and image.getchannel('A').getextrema()==(255,255):
+        report('Yüklenen görselin arka planı ayrılıyor…',phase='background')
+        from rembg import remove,new_session
+        image=remove(image,session=new_session('u2netp',providers=['CPUExecutionProvider']))
+    if (np.asarray(image.getchannel('A'))>128).sum()<64:raise RuntimeError('Görselde yeterli görünür nesne kalmadı. Arka plan ayırmayı kapatarak yeniden yükleyin.')
+    image.save(output / 'reference.png')
+    metadata={'prompt':job['prompt'],'translated':'','seed':job['seed'],'language':'en','source':'upload','removeBackground':job.get('removeBackground',True)}
+    (output / 'concept.json').write_text(json.dumps(metadata,ensure_ascii=False),encoding='utf-8')
+    report('Yüklenen görsel hazır. Doğruysa onaylayıp 3D üretin.',phase='concept-ready',translated='')
+
 def mesh(home,job,output):
     import torch,numpy as np
     from PIL import Image
@@ -151,10 +176,12 @@ def main():
     try:lock.acquire(timeout=0)
     except Timeout:raise RuntimeError('Yerel motor başka bir pencerede veya ağ istemcisinde çalışıyor. Önce o işlemi tamamlayın.')
     try:
-        import torch
-        torch.set_num_threads(max(1,min(4,(os.cpu_count() or 2)//2)))
+        if job['action']!='upload':
+            import torch
+            torch.set_num_threads(max(1,min(4,(os.cpu_count() or 2)//2)))
         output=home / 'jobs' / job['id'];output.mkdir(parents=True,exist_ok=True)
         if job['action']=='concept':concept(home,job,output)
+        elif job['action']=='upload':import_image(home,job,output)
         else:mesh(home,job,output)
     finally:lock.release()
 

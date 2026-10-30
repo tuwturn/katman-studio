@@ -1,6 +1,6 @@
 const $=id=>document.getElementById(id);
 export function initLocalAI({onEdit,onModelReady}){
- let active=false,timer,pending=false,part=null,loadedId=null,resultId=null,frameReady=false,queued=null,lastReady=false,localError=null,reportedJobId=null,reference=null,referenceId=null,lastBusy=false;
+ let active=false,timer,pending=false,preparing=false,part=null,loadedId=null,resultId=null,frameReady=false,queued=null,lastReady=false,localError=null,reportedJobId=null,reference=null,referenceId=null,lastBusy=false;
  const frame=$('ai-preview-frame');
  async function bridge(action,data){
   if(window.katmanDesktop?.localAI)return window.katmanDesktop.localAI(action,data);
@@ -13,16 +13,20 @@ export function initLocalAI({onEdit,onModelReady}){
  function sendPreview(){if(frameReady&&queued){frame.contentWindow.postMessage({type:'katman-generated-model',parts:[queued.part],name:queued.name,token:queued.id},location.origin);queued=null;}}
  frame.addEventListener('load',()=>{frameReady=true;sendPreview();});
  window.addEventListener('message',event=>{
-  if(event.source!==frame.contentWindow||event.origin!==location.origin||event.data?.type!=='katman-generated-loaded'||event.data.token!==resultId)return;
+  if(event.source!==frame.contentWindow||event.origin!==location.origin)return;
+  if(event.data?.type==='katman-reference-file'){upload(event.data.file);return;}
+  if(event.data?.type!=='katman-generated-loaded'||event.data.token!==resultId)return;
   if(event.data.error){error(new Error(event.data.error));return;}
   loadedId=event.data.token;$('ai-result').textContent=part?`${part.vertices.length.toLocaleString('tr-TR')} köşe · ${part.triangles.length.toLocaleString('tr-TR')} üçgen`:'';
   $('ai-state').textContent='3D model hazır. Kontrol görseliyle karşılaştırıp kaydedebilirsiniz.';updateButtons(lastBusy,lastReady);
  });
- function approved(){return reference&&$('ai-prompt').value.trim()===reference.prompt&&$('ai-language').value===reference.language;}
+ function approved(){return reference&&(reference.source==='upload'?!$('ai-prompt').value.trim():$('ai-prompt').value.trim()===reference.prompt&&$('ai-language').value===reference.language);}
  function updateButtons(busy,ready){
+  busy=busy||preparing;
   lastBusy=busy;$('ai-generate').disabled=busy||!ready;$('ai-build').disabled=busy||!ready||!approved();$('ai-install').disabled=busy;$('ai-cancel').hidden=!busy;
   for(const id of ['ai-edit','ai-export'])$(id).disabled=busy||!part||!loadedId;
-  for(const id of ['ai-prompt','ai-language','ai-height','ai-quality','ai-seed'])$(id).disabled=busy;
+  for(const id of ['ai-prompt','ai-language','ai-height','ai-quality','ai-seed','ai-remove-background'])$(id).disabled=busy;
+  $('ai-upload').disabled=busy||!ready;$('ai-image-file').disabled=busy||!ready;
   onModelReady?.(!!part&&!!loadedId&&!busy);
  }
  for(const id of ['ai-prompt','ai-language'])$(id).addEventListener('input',()=>updateButtons(lastBusy,lastReady));
@@ -43,7 +47,8 @@ export function initLocalAI({onEdit,onModelReady}){
     if(part){part=null;loadedId=null;resultId=null;queued=null;frameReady=false;frame.src='mesh-editor.html?preview=1';view(false);$('ai-result').textContent='Henüz 3D model üretilmedi.';}
     $('ai-concept-image').src=value.image;$('ai-concept-image').hidden=false;$('ai-concept-empty').hidden=true;$('ai-concept-note').hidden=false;
     $('ai-preview-name').textContent=value.prompt;
-    if(!$('ai-prompt').value.trim()){$('ai-prompt').value=value.prompt;$('ai-language').value=value.language;$('ai-seed').value=value.seed;}
+    if(value.source==='upload'){$('ai-prompt').value='';$('ai-upload-name').textContent='Yüklenen görsel: '+value.prompt;$('ai-translated').textContent='Yüklediğin görsel kullanılıyor; yazıdan yeni görsel üretilmedi.';}
+    else{$('ai-upload-name').textContent='';if(!$('ai-prompt').value.trim()){$('ai-prompt').value=value.prompt;$('ai-language').value=value.language;$('ai-seed').value=value.seed;}}
     updateButtons(state.busy||pending,state.ready);
    }
    if(reference&&!part&&!state.busy&&!localError&&(!job||job.state==='succeeded')){
@@ -58,15 +63,26 @@ export function initLocalAI({onEdit,onModelReady}){
  }
  async function run(action,data){
   if(pending)return;pending=true;localError=null;updateButtons(true,false);$('ai-state').classList.remove('ai-state-error');$('ai-state').textContent='İşlem başlatılıyor…';
-  try{await bridge(action,data);if(action==='concept'){part=null;loadedId=null;resultId=null;queued=null;frameReady=false;frame.src='mesh-editor.html?preview=1';view(false);$('ai-result').textContent='Henüz 3D model üretilmedi.';}}
+  try{await bridge(action,data);if(action==='concept'||action==='import-image'){part=null;loadedId=null;resultId=null;queued=null;frameReady=false;frame.src='mesh-editor.html?preview=1';view(false);$('ai-result').textContent='Henüz 3D model üretilmedi.';}}
   catch(e){pending=false;updateButtons(false,lastReady);error(e);return;}finally{pending=false;}
   await poll();
  }
  function options(){const rawSeed=$('ai-seed').value;return{prompt:$('ai-prompt').value.trim(),language:$('ai-language').value,height:Number($('ai-height').value),quality:$('ai-quality').value,seed:rawSeed===''?Math.floor(Math.random()*2**31):Number(rawSeed)};}
  $('ai-install').onclick=()=>run('install');$('ai-cancel').onclick=async()=>{try{await bridge('cancel');await poll();}catch(e){error(e);}};
  $('ai-generate').onclick=()=>{const data=options();if(!data.prompt)return error(new Error('Önce üretilecek nesneyi tarif edin.'));run('concept',data);};
+ async function upload(file){
+  if(!file||lastBusy||pending||preparing||!lastReady)return;
+  preparing=true;localError=null;updateButtons(true,lastReady);$('ai-state').classList.remove('ai-state-error');$('ai-state').textContent='Görsel yüklemeye hazırlanıyor…';
+  try{
+   if(!['image/png','image/jpeg','image/webp'].includes(file.type))throw new Error('PNG, JPG veya WEBP görseli seçin.');
+   if(file.size>25*1024*1024)throw new Error('Görsel en fazla 25 MB olabilir.');
+   const bitmap=await createImageBitmap(file);try{if(bitmap.width*bitmap.height>25_000_000)throw new Error('Görsel en fazla 25 milyon piksel olabilir.');const scale=Math.min(1,1024/Math.max(bitmap.width,bitmap.height)),canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);preparing=false;await run('import-image',{...options(),name:file.name,image:canvas.toDataURL('image/png'),removeBackground:$('ai-remove-background').checked});}finally{bitmap.close();}
+  }catch(e){error(e);}finally{preparing=false;$('ai-image-file').value='';await poll();}
+ }
+ $('ai-upload').onclick=()=>$('ai-image-file').click();$('ai-image-file').onchange=e=>upload(e.target.files[0]);
+ $('local-ai-host').ondragover=e=>{e.preventDefault();};$('local-ai-host').ondrop=e=>{e.preventDefault();upload(e.dataTransfer.files[0]);};
  $('ai-build').onclick=()=>{if(approved())run('generate',{...options(),referenceId:reference.id});};
  $('ai-edit').onclick=()=>{if(part&&loadedId)onEdit(part,$('ai-preview-name').textContent);};
  $('ai-export').onclick=()=>{if(part&&loadedId)frame.contentWindow.postMessage({type:'katman-editor-action',action:'export',format:$('ai-format').value},location.origin);};
- return{show(){active=true;if(!frame.getAttribute('src'))frame.src='mesh-editor.html?preview=1';poll();},hide(){active=false;clearTimeout(timer);},action(action){if(action==='save'||action==='export')$('ai-export').click();else if(action==='help')$('ai-help').open=true;else if(action==='open'||action==='image')$('ai-prompt').focus();}};
+ return{show(){active=true;if(!frame.getAttribute('src'))frame.src='mesh-editor.html?preview=1';poll();},hide(){active=false;clearTimeout(timer);},action(action){if(action==='save'||action==='export')$('ai-export').click();else if(action==='help')$('ai-help').open=true;else if(action==='open'||action==='image')$('ai-upload').click();}};
 }

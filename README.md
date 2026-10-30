@@ -1,4 +1,4 @@
-# Katman Studio 3.9 — Otomatik görselden vektör ve 3D
+# Katman Studio 3.10 — Otomatik görselden vektör ve 3D
 
 Uygulama boş açılır. Görseli ekleyin; renk ayrımı, düzgün vektör eğrileri ve ayrıntı kalitesi otomatik hazırlanır. Piksel çözünürlüğü, kenar filtresi, gölge veya Z büyütme ayarı yapmanız gerekmez.
 
@@ -29,7 +29,7 @@ Doğrulama: iç taban yazısı silinirken duvarların hacmi ve sınırları koru
 
 Windows paketindeki `Masaustu/Katman Studio/Web-Sunucusu-Baslat.bat` dosyasını açın. Node.js kurmaya gerek yoktur; paketli uygulamanın çalışma ortamı kullanılır. Tarayıcı otomatik açılır ve konsolda bu bilgisayarın IP adresleri gösterilir. Aynı Wi-Fi/Ethernet ağındaki diğer bilgisayarlarda gösterilen `http://IP:PORT/` adresini açın. Sunucu penceresi açık kalmalıdır; Ctrl+C ile kapatılır. Varsayılan port 8787’dir; doluysa sonraki boş port seçilir. Özel port için `Web-Sunucusu-Baslat.bat --port 9000` kullanılabilir.
 
-Windows ağ erişim izni sorarsa güvendiğiniz özel yerel ağ için izin verin. Tarayıcılar kendi çalışmalarını tutar; cihazlar arasında proje taşımak için `.katman` dosyasını kaydedip açın. Görseller istemci tarayıcısında işlenir; sunucuya yüklenmez. Sunucu sadece uygulamanın statik dosyalarını sunar.
+Windows ağ erişim izni sorarsa güvendiğiniz özel yerel ağ için izin verin. Tarayıcılar kendi çalışmalarını tutar; cihazlar arasında proje taşımak için `.katman` dosyasını kaydedip açın. Vektör/kabartma ve model düzenleme istemci tarayıcısında çalışır. Yerel YZ motoru sunucu bilgisayarında çalışır; bu alanda seçilen görsel, aynı yerel ağdaki sunucu bilgisayarına aktarılır. Bulut servisine gönderilmez. YZ motoru ve son YZ üretimi ağ istemcileri arasında ortaktır.
 
 Kaynak koddan aynı kullanım: `npm run start:web -- --lan --open`. `--lan` verilmezse yalnızca bu bilgisayarda (`127.0.0.1`) erişim açılır.
 
@@ -169,3 +169,13 @@ Motor `local-ai/install_v2.py --home <model-klasörü>` ile veya uygulamadaki ku
 `tests/local-ai-ui.mjs` açıkça sahte test verisiyle serbest tarifin iletilmesini, görsel onayı kapısını, değiştirilmiş tarifin reddini, dışa aktarma ve geri almayı sınar. Bu test **YZ kalitesi ölçümü değildir**. Gerçek kurulumla `node tests/local-ai-real.mjs --concept "tarif"` çalıştırılıp oluşan PNG incelenir; ardından `node tests/local-ai-real.mjs --mesh <onaylanan-görsel-uuid>` ile ayrı ve açık bir 3D üretimi yapılır. `--en` İngilizce tarif seçer. Mac çıkarımı bu oturumda doğrulanmış sayılmaz.
 
 Windows CPU üzerinde gerçek doğrulama: aynı Türkçe ördek tarifinin kontrol görseli yaklaşık 72 saniyede, farklı kırmızı çaydanlık tarifinin kontrol görseli 63 saniyede üretildi. Ördek görseli masaüstü arayüzündeki onay düğmesiyle gerçek 3D'ye çevrildi; üretim, önizleme ve çıktı kontrolleri yaklaşık 465 saniye sürdü (hızlı taslak). Bunlar tek bilgisayardaki ölçümlerdir. Yüzey çözümünün üst üste binen/sıfır alanlı üçgenleri çıktıdan temizlenir; farklı geçerli parçalar korunur. Gerçek örnekte temizlenmiş 301.214 üçgenli modelin sınırları ve hacmi korundu; yeniden açılan STL kapalı ve 100 mm olarak doğrulandı. 3MF kaydı ve düzenleyiciye aktarımı da gerçek modelle sınandı. `tests/local-ai-mesh.py`, kurulu YZ ortamının Python'u ile ağ/inferans gerektirmeden bu temizliğin kapalı yüzey, hacim ve ayrı parçaları korumasını kontrol eder.
+
+## 3.10 — Kendi görselinden yerel 3D
+
+**Yazı / görselden 3D · Yerel YZ** sekmesindeki **Görsel yükle / buraya sürükle** alanı PNG, JPG ve WEBP kabul eder. Metin yazmak gerekmez; yüklenen görsel SD-Turbo'da yeniden çizilmez. Görseli kontrol edip **Görseli onayla ve 3D üret** düğmesine basın. Bu alan tam 3D biçim tahmini yapar; önceki **Görselden 3D** sekmesindeki vektör/kabartma iş akışı ayrıca korunur.
+
+**Yüklerken arka planı ayır** seçeneği yüklemeden önce seçilir. Gerçek saydamlığı olan PNG/WEBP'de mevcut alfa kanalı korunur ve tekrar otomatik kesim yapılmaz. Diğer görsellerde isteğe bağlı yerel arka plan ayırma uygulanır. Önizlemedeki sonuç doğru değilse bu seçeneği değiştirip görseli tekrar yükleyin. Kaynak dosya değiştirilmez. En fazla 25 MB / 25 milyon piksellik görsel kabul edilir; çalışma kopyasının uzun kenarı otomatik olarak 1024'e sığdırılır. Piksel/kalite parametresi ayarlamanız gerekmez.
+
+Masaüstünde dosya yerel IPC ile, LAN tarayıcısında aynı ağdaki sunucu bilgisayarına boyut ve tür kontrolü olan bir istekle iletilir. API dosya yolu veya harici görsel URL'si kabul etmez. 3D üretimi bilgisayarda kalır; yeni model indirmesi veya API anahtarı gerekmez (3.9 motoru kurulmuşsa). Sonuç döndürülebilir, STL/3MF/OBJ kaydedilebilir ve düzenleyiciye aktarılabilir. Tek fotoğrafın görünmeyen yüzeyi model tarafından tahmin edilir; çıktı hâlâ tek renk geometridir.
+
+Gerçek masaüstü doğrulamasında bir çaydanlık PNG'si dosya seçicisinden yüklendi. Metin girilmeden ve SD-Turbo çağrılmadan yerel 3D üretimi, önizleme, STL/3MF kaydı ve düzenleyiciye aktarım tamamlandı. Bu bilgisayarda hızlı taslak akışı yaklaşık 448 saniye sürdü; 208.784 üçgenli STL yeniden açılıp kapalı ve 100 mm olarak doğrulandı. Birim testleri saydamlığı ve arka planı korumayı; arayüz testi dosya seçiciyi ve 3D önizleme üstüne sürüklemeyi; LAN testi 4 KB'den büyük görsel isteğinin doğru uçta kabul edilmesini sınar. Arayüz testinin şekli açıkça test verisidir; gerçek çıkarım doğrulaması bundan ayrıdır.
