@@ -1,6 +1,6 @@
 {
   "name": "katman-image-to-3mf",
-  "version": "3.5.0",
+  "version": "3.6.0",
   "private": true,
   "type": "module",
   "scripts": {

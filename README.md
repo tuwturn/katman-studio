@@ -1,4 +1,4 @@
-# Katman Studio 3.5 — Otomatik görselden vektör ve 3D
+# Katman Studio 3.6 — Otomatik görselden vektör ve 3D
 
 Uygulama boş açılır. Görseli ekleyin; renk ayrımı, düzgün vektör eğrileri ve ayrıntı kalitesi otomatik hazırlanır. Piksel çözünürlüğü, kenar filtresi, gölge veya Z büyütme ayarı yapmanız gerekmez.
 
@@ -129,3 +129,9 @@ Sağdaki **Alan doldur / yüzey çiz** paneli noktalarla çizilen kapalı alana 
 Sabit görünüm sürekli çizilmez; kamera/alan/model değiştiğinde çizilir ve kamera yumuşatması tamamlanınca durur. Görünmeyen çalışma alanları durur. Kapatılmış alan üzerinde fare hareketi dolgu hesabını tekrarlamaz; sabit seçim ve dolgu geometrileri yeniden kullanılır. Taslak fare hareketleri kare başına birleştirilir. Görünüm tamponları ve BVH seçim ağacı arka planda hazırlanır; üçgen sırası ve model geometrisi korunur. Geri alma görünüm tamponlarını yeniden kullanır. Zemine taşıma ve STL/3MF/OBJ üretimi arka planda çalışır. Normal masaüstü açılışı ekran kartını kullanır; yazılımsal çizim yalnızca otomatik testlerde isteğe bağlıdır.
 
 `node tests/mesh-performance.mjs` gerçek modelde hareketsiz çizim sayısını ve kapalı seçim üzerindeki fare hareketi maliyetini ölçer. `TEST_MODEL` dosya yolunu, `PERF_ASSERT=1` performans kontrollerini etkinleştirir. Bu bilgisayarda 340.607 üçgenlik dosyada 600 ms içindeki hareketsiz çizim çağrıları 178’den 0’a, 80 fare hareketinin JavaScript süresi yaklaşık 661 ms’den 1 ms altına indi. Bunlar yerel ölçümlerdir; kesim motorunun toplam süresi veya bütün bilgisayarlar için FPS garantisi değildir.
+
+## 3.6 — Seçimin dışına taşan kesim düzeltmesi
+
+Kusurlu kaynak ağlarda kesim sınıflandırıcısı, seçime kısmen giren uzun yüzeylerin dışarıdaki parçalarını kaybedebiliyordu. Yerel kesim/düzleme artık kaynak üçgenleri seçim prizmasının sınırlarında böler; dış parçalar kaynak koordinatları ve renkleriyle korunur. Kesim kapakları da gerçek seçim sınırına kırpılır. İçbükey, daire, eğik ve örtüşen alanlar desteklenir. Kusurlu kaynağın tamamının onarıldığı veya çıktının kapalı katı olduğu iddia edilmez; mevcut ağ uyarısı sürer. Taralı alanın içinde kalan çerçeve ve diğer geometri kesime dahildir.
+
+Gerçek dosyada çerçeveye taşan seçim regresyonu: `TEST_MODEL` Gallardo 3MF yolunu, `TEST_CUT_INSET=1` içeri taşan alanı seçer; `node tests/mesh-real-edit.mjs` STL çıktısında uzun yüzeylerin dış kısımlarını en yakın yüzey mesafesiyle kontrol eder. `KATMAN_NATIVE=1` masaüstü EXE üzerinde aynı testi çalıştırır. `tests/mesh-clip.test.mjs` uzun üçgenleri, eğik/çokgen/daire kesimleri, renk interpolasyonunu ve örtüşen kapakları kontrol eder.

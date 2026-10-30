@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {Brush,Evaluator,SUBTRACTION,ADDITION} from 'three-bvh-csg';
 import {polygonPoints,footprintsOverlap} from './selection-polygon.js';
+import {boundedSubtract} from './mesh-clip.js';
 
 // A best-effort, local fallback for imported meshes rejected by Manifold.
 // This does not repair the source mesh or certify the result as watertight.
@@ -25,6 +26,7 @@ export function editSurface(part,areas,mode,progress=()=>{}){
   const p=result.geometry.getAttribute('position'),c=result.geometry.getAttribute('color'),index=result.geometry.index,vertices=[],colors=[],triangles=[];
   for(let i=0;i<p.count;i++){vertices.push([p.getX(i),p.getY(i),p.getZ(i)]);colors.push([c.getX(i),c.getY(i),c.getZ(i)]);}
   const count=Math.min(index?index.count:p.count,result.geometry.drawRange.count);for(let i=0;i<count;i+=3)triangles.push([0,1,2].map(j=>index?index.getX(i+j):i+j));
+  if(mode!=='fill'){progress('Seçim sınırı dışındaki yüzey parçaları korunuyor…');const clipped=boundedSubtract(part,volumes,{vertices,colors,triangles});if(!clipped&&mode!=='cut')throw new Error('Seçim modelin tamamını kaldırıyor. Alanı küçültün.');return clipped;}
   // Retain every original triangle strictly outside the edit volumes. A defective
   // distant shell must never be reclassified or dropped by a global boolean.
   const outside=(points,a)=>{const d=points.map(p=>p.map((x,j)=>x-a.center[j])),ranges=[a.u,a.v,a.n].map(axis=>d.map(p=>p.reduce((s,x,j)=>s+x*axis[j],0))),lo=[-a.width/2,-a.height/2,mode==='fill'?a.offset-a.depth:a.offset],hi=[a.width/2,a.height/2,mode==='fill'?a.offset:a.offset+a.depth];if(ranges.some((r,j)=>Math.max(...r)<lo[j]-1e-5||Math.min(...r)>hi[j]+1e-5))return true;return a.shape==='polygon'&&!footprintsOverlap(a.points,points.map((_,i)=>[ranges[0][i],ranges[1][i]]));};
