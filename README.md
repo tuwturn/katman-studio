@@ -1,10 +1,10 @@
-# Katman Studio 3.8 — Otomatik görselden vektör ve 3D
+# Katman Studio 3.9 — Otomatik görselden vektör ve 3D
 
 Uygulama boş açılır. Görseli ekleyin; renk ayrımı, düzgün vektör eğrileri ve ayrıntı kalitesi otomatik hazırlanır. Piksel çözünürlüğü, kenar filtresi, gölge veya Z büyütme ayarı yapmanız gerekmez.
 
 ## Açma
 
-**Baslat.bat** dosyasını veya **Masaustu/Katman Studio/Katman Studio.exe** dosyasını açın. Hazır Windows paketi Node.js, internet, sunucu veya tarayıcı gerektirmez. EXE'yi taşırken yanındaki dosyaları da içeren klasörün tamamını taşıyın.
+**Baslat.bat** dosyasını veya **Masaustu/Katman Studio/Katman Studio.exe** dosyasını açın. Görsel dönüştürme ve 3D düzenleme için hazır Windows paketi Node.js, internet, sunucu veya tarayıcı gerektirmez. Yazıdan 3D motorunun ilk kurulumunda Python 3.10–3.12 ve internet gerekir; sonraki üretimler yereldir. EXE'yi taşırken yanındaki dosyaları da içeren klasörün tamamını taşıyın.
 
 ## 3D model düzenleme
 
@@ -157,3 +157,15 @@ Bu sürüm işlemciyi kullanır; Windows Radeon RX 6700 XT’de CUDA varsayılma
 Model ve sonuçlar Windows’ta `%APPDATA%/Katman Studio/Yerel-YZ` altında bulunur; `KATMAN_AI_HOME` ile değiştirilebilir. Hazır motor masaüstünde yerel IPC ile, tarayıcı/LAN kullanımında aynı bilgisayardaki Node sunucusu üzerinden çağrılır. Tarif bulut servisine gönderilmez. Mac’te ayrı Python kurulumu gerekebilir; yerel çıkarım bu geliştirme oturumunda Windows CPU üzerinde doğrulanır, Mac için aynı çıkarım doğrulaması yapılmış sayılmaz.
 
 Geliştirici kurulumu: `python local-ai/install.py --home <model-klasörü>`. Sonra `KATMAN_AI_HOME` bu klasöre ayarlanarak uygulama veya `server.mjs` başlatılabilir. Büyük model dosyaları ve ortam depoya/uygulama paketine eklenmez. `tests/local-ai-ui.mjs` açıkça test verisiyle arayüz/aktarım akışını; `tests/local-ai.test.mjs` istek doğrulamasını ve LAN sınırlarını kontrol eder. Gerçek motor testi ayrıca gerçek ağırlıklar kullanılarak yapılmalıdır.
+
+## 3.9 — Kontrol görseli ve onaydan sonra yerel 3D
+
+Shap-E'nin tarif uyumu yetersiz kaldığı için yeni akış doğrudan Shap-E metin örneklemesini kullanmaz. Serbest Türkçe/İngilizce tarif önce [SD-Turbo](https://huggingface.co/stabilityai/sd-turbo) ile bilgisayarda bir **2D kontrol görseline** dönüştürülür. Kullanıcı doğru bulduğu görseli onayladığında [Hunyuan3D-2 Mini Turbo](https://huggingface.co/tencent/Hunyuan3D-2mini) bu görselden gerçek 3D yüzey üretir. Ördek/köylü düğmeleri kaldırılmıştır; nesne adlarına göre hazır şekil seçilmez. Tarif değişirse eski görselin onayı kullanılamaz. Uzun metnin sonu sessizce kırpılmaz; görsel modelinin metin sınırı aşılırsa kısaltma istenir.
+
+Motor `local-ai/install_v2.py --home <model-klasörü>` ile veya uygulamadaki kurulum düğmesiyle hazırlanır. Sabit model/kaynak sürümleri kullanılır. Büyük ağırlıklar parça parça indirilir ve depo metadatasındaki SHA-256 ile doğrulanır; kesilmiş indirmeler korunur. Yeni hazırlık işareti `ready-v2.json`'dır; eski Shap-E kurulumu yeni motor hazırmış gibi gösterilmez. Sonuçlar `last-concept-v2.json`, `last-model-v2.json` ve `jobs/<uuid>` altında kalır; eski model verisi silinmez.
+
+Çalıştırıcı bütün modelleri aynı anda bellekte tutmaz. Yerel çeviri, görsel üretimi, görüntüden özellik çıkarımı, biçim üretimi ve yüzey çözümü sırayla yapılır. Bu sürüm **işlemciyi** kullanır; AMD ekran kartında CUDA varsayılmaz. Üretim sırasında ağ soketleri ve model indirme yolları kapalıdır. **3D çıktı tek renk geometridir**; kontrol görselinin dokusu/renkleri aktarılmaz. Görselin tarife uyması, 3D arka yüzünün veya ince aksesuarların kusursuz çıkacağını garanti etmez. Üretilen 3D yüzey ayrıca kontrol edilmelidir. Model lisansları yukarıdaki resmî depolarda bulunur; ağırlıklar Git deposuna eklenmez.
+
+`tests/local-ai-ui.mjs` açıkça sahte test verisiyle serbest tarifin iletilmesini, görsel onayı kapısını, değiştirilmiş tarifin reddini, dışa aktarma ve geri almayı sınar. Bu test **YZ kalitesi ölçümü değildir**. Gerçek kurulumla `node tests/local-ai-real.mjs --concept "tarif"` çalıştırılıp oluşan PNG incelenir; ardından `node tests/local-ai-real.mjs --mesh <onaylanan-görsel-uuid>` ile ayrı ve açık bir 3D üretimi yapılır. `--en` İngilizce tarif seçer. Mac çıkarımı bu oturumda doğrulanmış sayılmaz.
+
+Windows CPU üzerinde gerçek doğrulama: aynı Türkçe ördek tarifinin kontrol görseli yaklaşık 72 saniyede, farklı kırmızı çaydanlık tarifinin kontrol görseli 63 saniyede üretildi. Ördek görseli masaüstü arayüzündeki onay düğmesiyle gerçek 3D'ye çevrildi; üretim, önizleme ve çıktı kontrolleri yaklaşık 465 saniye sürdü (hızlı taslak). Bunlar tek bilgisayardaki ölçümlerdir. Yüzey çözümünün üst üste binen/sıfır alanlı üçgenleri çıktıdan temizlenir; farklı geçerli parçalar korunur. Gerçek örnekte temizlenmiş 301.214 üçgenli modelin sınırları ve hacmi korundu; yeniden açılan STL kapalı ve 100 mm olarak doğrulandı. 3MF kaydı ve düzenleyiciye aktarımı da gerçek modelle sınandı. `tests/local-ai-mesh.py`, kurulu YZ ortamının Python'u ile ağ/inferans gerektirmeden bu temizliğin kapalı yüzey, hacim ve ayrı parçaları korumasını kontrol eder.

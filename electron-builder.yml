@@ -6,7 +6,7 @@ files:
   - public/**/*
   - desktop/**/*
   - local-ai/*.py
-  - local-ai/requirements.txt
+  - local-ai/requirements*.txt
   - server.mjs
   - package.json
   - '!node_modules/**/*'
