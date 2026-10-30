@@ -1,3 +1,4 @@
+import {rendererProfile} from './performance-profile.js';
 import {initLocalAI} from './local-ai-ui.js';
 import {historyKey,isTextEntry} from './editor-history.js';
 import {demandRenderer} from './demand-render.js';
@@ -18,10 +19,10 @@ function fail(e){console.error(e);toast(e.message||String(e));$('status').textCo
 function setBusy(value){busy=value;for(const id of ['file','open-project','import-image','empty-import'])$(id).disabled=value;for(const id of ['vectorize','export','save-project','apply-height'])$(id).disabled=value||!project;$('remove-background').disabled=value||!project;$('vectorize').textContent=value?'◌ Vektörleştiriliyor…':'↻ Vektörü yeniden oluştur';}
 function init3D(){
   // Log depth keeps 0.02 mm relief layers distinct at every orbit/zoom distance.
-  try{renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,logarithmicDepthBuffer:true});}catch{ $('viewport').insertAdjacentHTML('beforeend','<p style="padding:100px 35px">3D önizleme için tarayıcınızda WebGL / donanım hızlandırmayı açın. 2D düzenleme ve dışa aktarma kullanılabilir.</p>');return; }
-  renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.setClearColor(0,0);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.0;
+  try{renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,logarithmicDepthBuffer:true,powerPreference:'high-performance'});}catch{ $('viewport').insertAdjacentHTML('beforeend','<p style="padding:100px 35px">3D önizleme için tarayıcınızda WebGL / donanım hızlandırmayı açın. 2D düzenleme ve dışa aktarma kullanılabilir.</p>');return; }
+  const displayProfile=rendererProfile(renderer);renderer.setPixelRatio(Math.min(devicePixelRatio,displayProfile.pixelRatio));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.setClearColor(0,0);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.0;
   $('viewport').append(renderer.domElement);scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(35,1,.1,10000);camera.up.set(0,0,1);controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.mouseButtons.MIDDLE=THREE.MOUSE.PAN;controls.mouseButtons.RIGHT=THREE.MOUSE.ROTATE;controls.maxPolarAngle=Math.PI/2-.025;controls.minDistance=5;controls.maxDistance=4000;
-  scene.add(new THREE.AmbientLight(0xffffff,1.4));const light=new THREE.DirectionalLight(0xffffff,2.2);light.position.set(-80,-60,180);light.castShadow=true;light.shadow.mapSize.set(2048,2048);light.shadow.camera.left=-160;light.shadow.camera.right=160;light.shadow.camera.top=160;light.shadow.camera.bottom=-160;light.shadow.camera.far=700;light.shadow.normalBias=.004;scene.add(light);scene.add(new THREE.HemisphereLight(0xffffff,0x536789,.8));
+  scene.add(new THREE.AmbientLight(0xffffff,1.4));const light=new THREE.DirectionalLight(0xffffff,2.2);light.position.set(-80,-60,180);light.castShadow=true;light.shadow.mapSize.set(displayProfile.shadowSize,displayProfile.shadowSize);light.shadow.camera.left=-160;light.shadow.camera.right=160;light.shadow.camera.top=160;light.shadow.camera.bottom=-160;light.shadow.camera.far=700;light.shadow.normalBias=.004;scene.add(light);scene.add(new THREE.HemisphereLight(0xffffff,0x536789,.8));
   group=new THREE.Group();scene.add(group);
   ground=new THREE.Mesh(new THREE.PlaneGeometry(3000,3000),new THREE.ShadowMaterial({opacity:.13}));ground.position.z=-.08;ground.receiveShadow=true;scene.add(ground);
   let pointerStart=null;

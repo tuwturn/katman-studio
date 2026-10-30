@@ -1,3 +1,4 @@
+import {rendererProfile} from './performance-profile.js';
 import * as THREE from 'three';
 import {historyKey,isTextEntry} from './editor-history.js';
 import {acceleratedRaycast} from 'three-mesh-bvh';
@@ -15,13 +16,13 @@ import {unzipSync,strFromU8} from 'fflate';
 const $=id=>document.getElementById(id),viewport=$('model-viewport'),displayCache=new WeakMap(),previewOnly=new URLSearchParams(location.search).get('preview')==='1';if(previewOnly){document.body.classList.add('preview-only');$('model-empty').querySelector('b').textContent='Tarifinden üretilecek model burada görünecek';$('model-empty').querySelector('p').textContent='Soldan tarifini yazıp yerel üretimi başlat.';}
 let parts=[],selected=new Set(),reference=null,areas=[],history=[],future=[],sourceName='duzenlenen-model',tool='orbit',busy=false,worker,request,drag=null,flip=1,polygonDraft=[],polygonHover=null,previewKey=null,listedParts=null,listedSelection='',hoverFrame=0,hoverEvent=null,selectionFuture=[];
 const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(38,1,.01,100000),renderer=createRenderer();
-function createRenderer(){try{return new THREE.WebGLRenderer({antialias:true,alpha:true,logarithmicDepthBuffer:true});}catch(e){$('model-status').textContent='3D görünümü başlatılamadı. Donanım hızlandırmasını ve ekran kartı sürücüsünü kontrol edin.';throw e;}}
-camera.up.set(0,0,1);renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.localClippingEnabled=true;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.85;renderer.setClearColor(0,0);viewport.append(renderer.domElement);
+function createRenderer(){try{return new THREE.WebGLRenderer({antialias:true,alpha:true,logarithmicDepthBuffer:true,powerPreference:'high-performance'});}catch(e){$('model-status').textContent='3D görünümü başlatılamadı. Donanım hızlandırmasını ve ekran kartı sürücüsünü kontrol edin.';throw e;}}
+camera.up.set(0,0,1);const displayProfile=rendererProfile(renderer);renderer.setPixelRatio(Math.min(devicePixelRatio,displayProfile.pixelRatio));renderer.localClippingEnabled=true;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.85;renderer.setClearColor(0,0);viewport.append(renderer.domElement);
 const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.minDistance=.05;controls.maxDistance=100000; // full orbit, including interior undersides
 const invalidate=demandRenderer({render:()=>renderer.render(scene,camera),update:()=>controls.update(),visible:()=>!document.hidden&&viewport.clientWidth>0&&viewport.clientHeight>0});controls.addEventListener('change',invalidate);document.addEventListener('visibilitychange',invalidate);
 const model=new THREE.Group(),previews=new THREE.Group(),draftPreviews=new THREE.Group();scene.add(model,previews,draftPreviews,new THREE.AmbientLight(0xffffff,.28),new THREE.HemisphereLight(0xe6eeff,0x273348,.55));
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.shadowMap.autoUpdate=false;
-const light=new THREE.DirectionalLight(0xfff4e8,2.8);light.castShadow=true;light.shadow.mapSize.set(2048,2048);light.shadow.bias=-.00015;const fill=new THREE.DirectionalLight(0xb8d3ff,.35);scene.add(light,light.target,fill,fill.target);
+const light=new THREE.DirectionalLight(0xfff4e8,2.8);light.castShadow=true;light.shadow.mapSize.set(displayProfile.shadowSize,displayProfile.shadowSize);light.shadow.bias=-.00015;const fill=new THREE.DirectionalLight(0xb8d3ff,.35);scene.add(light,light.target,fill,fill.target);
 const shadowGround=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshStandardMaterial({color:0x253044,roughness:1,metalness:0}));shadowGround.receiveShadow=true;shadowGround.visible=false;scene.add(shadowGround);
 
 let grid,bounds=new THREE.Box3(new THREE.Vector3(-10,-10,-10),new THREE.Vector3(10,10,10)),clip=new THREE.Plane(),arrow;
