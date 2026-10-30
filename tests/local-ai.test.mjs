@@ -3,6 +3,27 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {createWebServer} from '../server.mjs';
 const require=createRequire(import.meta.url),{validatePrompt,validateImage,LocalAI}=require('../desktop/local-ai.cjs');
+test('GPU selection defaults to verified adapter, supports CPU override and rejects unavailable GPU',async()=>{
+ const engine=new LocalAI({home:process.cwd()+'/test-results/not-installed-ai',scripts:process.cwd()+'/local-ai'});engine.ready=()=>true;engine.gpu=()=>null;
+ assert.equal(engine.compute({}).backend,'cpu');assert.throws(()=>engine.compute({compute:'gpu'}),/kurun/);assert.throws(()=>engine.compute({compute:'bogus'}),/Geçersiz/);
+ engine.gpu=()=>({backend:'rocm',name:'Test adapter'});assert.equal(engine.compute({}).backend,'rocm');assert.equal(engine.compute({compute:'cpu'}).backend,'cpu');
+ let launched;engine.launch=(kind,python,args,input)=>launched={kind,python,input};await engine.generate({prompt:'teapot',seed:42},'concept');assert.equal(launched.python,engine.gpuPython());assert.equal(launched.input.backend,'rocm');
+ await engine.generate({prompt:'teapot',seed:42,compute:'cpu'},'concept');assert.equal(launched.python,engine.python());assert.equal(launched.input.backend,'cpu');
+});
+test('automatic GPU failure retries the exact input once on CPU; forced GPU and cancellation do not retry',async()=>{
+ const {mkdtemp,writeFile,rm}=await import('node:fs/promises'),{tmpdir}=await import('node:os'),path=await import('node:path');const folder=await mkdtemp(path.join(tmpdir(),'katman-gpu-'));
+ try{
+  await writeFile(path.join(folder,'generate_v2.py'),"process.stdin.resume();process.stdin.on('end',()=>console.log(JSON.stringify({message:'CPU completed',device:'İşlemci'})))");
+  for(const mode of ['auto','gpu','cancel']){
+   const engine=new LocalAI({home:folder,scripts:folder});engine.python=()=>process.execPath;
+   engine.launch('benchmark',process.execPath,['-e',"process.stdin.resume();setTimeout(()=>{console.error('GPU memory test failure');process.exit(1)},100)"],{backend:'rocm',compute:mode==='cancel'?'auto':mode,action:'generate',seed:42,referenceId:'approved-reference',height:100});
+   if(mode==='cancel')engine.job.state='cancelled';
+   const start=Date.now();while(engine.child){assert(Date.now()-start<10000);await new Promise(r=>setTimeout(r,20));}
+   if(mode==='auto'){assert.equal(engine.job.state,'succeeded');assert.equal(engine.job.backend,'cpu');assert.equal(engine.job.seed,42);assert.equal(engine.job.referenceId,'approved-reference');assert.match(engine.job.fallback,/GPU memory/);assert.match(engine.job.message,/işlemci/);}
+   else assert.equal(engine.job.state,mode==='cancel'?'cancelled':'failed');
+  }
+ }finally{await rm(folder,{recursive:true,force:true});}
+});
 test('image uploads accept only bounded image data and bypass text-to-image generation',async()=>{
  const image='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLttAAAAABJRU5ErkJggg==';
  assert.equal(validateImage({image,name:'C:\\fakepath\\My image.png'}).prompt,'My image');

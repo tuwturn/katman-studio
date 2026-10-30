@@ -42,6 +42,7 @@ def concept(home,job,output):
     image_prompt=f'{prompt}, single complete object, full body, isolated on a plain white background, 3D sculpture, studio product photograph'
     report('Tariften kontrol görseli üretiliyor…',phase='concept',translated=prompt)
     pipe=StableDiffusionPipeline.from_pretrained(str(home / 'models-v2' / 'image'),variant='fp16',torch_dtype=torch.float32,local_files_only=True)
+    device=job.get('_device',torch.device('cpu'));pipe.to(device)
     if len(pipe.tokenizer(image_prompt,truncation=False).input_ids)>pipe.tokenizer.model_max_length:
         raise RuntimeError('Tarif bu görsel modeli için çok uzun. Ana nesne ve önemli ayrıntıları koruyarak kısaltın; tarifin sonu sessizce atılmadı.')
     pipe.set_progress_bar_config(disable=True);pipe.enable_attention_slicing();pipe.enable_vae_slicing()
@@ -98,6 +99,8 @@ def mesh(home,job,output):
     from hy3dgen.shapegen.models.autoencoders import ShapeVAE
     from safetensors import safe_open
     import yaml
+    from gpu_runtime import release_device
+    device=job.get('_device',torch.device('cpu'))
     reference=home / 'jobs' / job['referenceId']
     metadata=json.loads((reference / 'concept.json').read_text(encoding='utf-8'))
     image=Image.open(reference / 'reference.png').convert('RGBA')
@@ -112,7 +115,7 @@ def mesh(home,job,output):
             prefix=name+'.';state={key[len(prefix):]:weights.get_tensor(key) for key in weights.keys() if key.startswith(prefix)}
             module.load_state_dict(state,strict=True)
         del state
-        return module.eval()
+        return module.eval().to(device)
     processor=instantiate_from_config(config['image_processor'])
     report('Onaylanan görselin 3D özellikleri çıkarılıyor…',phase='encode')
     conditioner=component('conditioner')
@@ -120,9 +123,9 @@ def mesh(home,job,output):
     for number,layer in enumerate(layers,1):
         if number%5==0 or number==len(layers):
             layer.register_forward_hook(lambda _m,_a,_o,n=number:report(f'Görselin 3D özellikleri çözümleniyor · {n}/{len(layers)}',phase='encode'))
-    inputs=processor(image)
+    inputs={key:value.to(device) if isinstance(value,torch.Tensor) else value for key,value in processor(image).items()}
     with torch.inference_mode():embedding=conditioner(**inputs)['main']
-    del conditioner,inputs,layers,layer;gc.collect()
+    del conditioner,inputs,layers,layer;release_device(device)
     class CachedConditioner(torch.nn.Module):
         def __init__(self,value):super().__init__();self.register_buffer('value',value)
         def forward(self,**kwargs):return {'main':self.value}
@@ -130,15 +133,15 @@ def mesh(home,job,output):
         latent_shape=(config['vae']['params']['num_latents'],config['vae']['params']['embed_dim'])
     model=component('model')
     scheduler=instantiate_from_config(config['scheduler'])
-    pipeline=Hunyuan3DDiTFlowMatchingPipeline(vae=LatentShape(),model=model,scheduler=scheduler,conditioner=CachedConditioner(embedding),image_processor=processor,device='cpu',dtype=torch.float32)
+    pipeline=Hunyuan3DDiTFlowMatchingPipeline(vae=LatentShape(),model=model,scheduler=scheduler,conditioner=CachedConditioner(embedding),image_processor=processor,device=device,dtype=torch.float32)
     steps=5
     def progress(step,*args):report(f'Onaylanan görselden 3D biçim üretiliyor · {step+1}/{steps}',phase='sample',progress=(step+1)*100/steps)
     with torch.inference_mode():
         latents=pipeline(image=image,num_inference_steps=steps,guidance_scale=5.0,output_type='latent',generator=torch.Generator('cpu').manual_seed(job['seed']),callback=progress,callback_steps=1,enable_pbar=False)
-    del pipeline,model,embedding;gc.collect()
+    del pipeline,model,embedding;release_device(device)
     report('3D yüzey çıkarılıyor…',phase='decode')
     vae_folder=folder.parent / 'hunyuan3d-vae-v2-mini-turbo'
-    vae=ShapeVAE.from_single_file(str(vae_folder / 'model.fp16.safetensors'),str(vae_folder / 'config.yaml'),device='cpu',dtype=torch.float32,use_safetensors=True).eval()
+    vae=ShapeVAE.from_single_file(str(vae_folder / 'model.fp16.safetensors'),str(vae_folder / 'config.yaml'),device=device,dtype=torch.float32,use_safetensors=True).eval()
     vae.enable_flashvdm_decoder(adaptive_kv_selection=True,topk_mode='mean',mc_algo='mc')
     chunks=[0];last_report=[0.]
     def decoding_progress(*_):
@@ -179,6 +182,9 @@ def main():
         if job['action']!='upload':
             import torch
             torch.set_num_threads(max(1,min(4,(os.cpu_count() or 2)//2)))
+            from gpu_runtime import device_for
+            job['_device'],device_name=device_for(job.get('backend','cpu'))
+            report('Hesaplama aygıtı: '+device_name,phase='device',device=device_name,backend=job.get('backend','cpu'))
         output=home / 'jobs' / job['id'];output.mkdir(parents=True,exist_ok=True)
         if job['action']=='concept':concept(home,job,output)
         elif job['action']=='upload':import_image(home,job,output)

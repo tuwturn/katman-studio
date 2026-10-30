@@ -12,7 +12,7 @@ let localAI;
 const root=path.resolve(__dirname,'../public');
 const action = async name => {if(!window)await createWindow();window?.webContents.send('katman:action',name);};
 async function createWindow(){
-  const win=new BrowserWindow({width:1460,height:960,minWidth:1060,minHeight:700,show:false,backgroundColor:'#101216',title:'Katman Studio 3.10',icon:path.join(root,'icon.png'),titleBarStyle:'hidden',...(isMac?{trafficLightPosition:{x:14,y:12}}:{titleBarOverlay:{color:'#121419',symbolColor:'#9baac4',height:37}}),webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
+  const win=new BrowserWindow({width:1460,height:960,minWidth:1060,minHeight:700,show:false,backgroundColor:'#101216',title:'Katman Studio 3.11',icon:path.join(root,'icon.png'),titleBarStyle:'hidden',...(isMac?{trafficLightPosition:{x:14,y:12}}:{titleBarOverlay:{color:'#121419',symbolColor:'#9baac4',height:37}}),webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
   window=win;
   win.webContents.on('before-input-event',(event,input)=>{if(input.type!=='keyDown'||!(input.control||input.meta)||input.alt)return;const key=input.key.toLowerCase();if(key==='z'||key==='y'){event.preventDefault();win.webContents.send('katman:action',key==='y'||input.shift?'redo':'undo');}});
   if(!isMac)win.setMenuBarVisibility(false);

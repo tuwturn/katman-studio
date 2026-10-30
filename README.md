@@ -1,4 +1,4 @@
-# Katman Studio 3.10 — Otomatik görselden vektör ve 3D
+# Katman Studio 3.11 — Otomatik görselden vektör ve 3D
 
 Uygulama boş açılır. Görseli ekleyin; renk ayrımı, düzgün vektör eğrileri ve ayrıntı kalitesi otomatik hazırlanır. Piksel çözünürlüğü, kenar filtresi, gölge veya Z büyütme ayarı yapmanız gerekmez.
 
@@ -179,3 +179,14 @@ Windows CPU üzerinde gerçek doğrulama: aynı Türkçe ördek tarifinin kontro
 Masaüstünde dosya yerel IPC ile, LAN tarayıcısında aynı ağdaki sunucu bilgisayarına boyut ve tür kontrolü olan bir istekle iletilir. API dosya yolu veya harici görsel URL'si kabul etmez. 3D üretimi bilgisayarda kalır; yeni model indirmesi veya API anahtarı gerekmez (3.9 motoru kurulmuşsa). Sonuç döndürülebilir, STL/3MF/OBJ kaydedilebilir ve düzenleyiciye aktarılabilir. Tek fotoğrafın görünmeyen yüzeyi model tarafından tahmin edilir; çıktı hâlâ tek renk geometridir.
 
 Gerçek masaüstü doğrulamasında bir çaydanlık PNG'si dosya seçicisinden yüklendi. Metin girilmeden ve SD-Turbo çağrılmadan yerel 3D üretimi, önizleme, STL/3MF kaydı ve düzenleyiciye aktarım tamamlandı. Bu bilgisayarda hızlı taslak akışı yaklaşık 448 saniye sürdü; 208.784 üçgenli STL yeniden açılıp kapalı ve 100 mm olarak doğrulandı. Birim testleri saydamlığı ve arka planı korumayı; arayüz testi dosya seçiciyi ve 3D önizleme üstüne sürüklemeyi; LAN testi 4 KB'den büyük görsel isteğinin doğru uçta kabul edilmesini sınar. Arayüz testinin şekli açıkça test verisidir; gerçek çıkarım doğrulaması bundan ayrıdır.
+
+
+## 3.11 — AMD ekran kartıyla yerel YZ hızlandırma
+
+Yerel YZ sekmesindeki **Hesaplama** seçimi **Otomatik · GPU öncelikli**, **Ekran kartı · AMD** ve **İşlemci** sunar. Windows'ta önce normal yerel motoru, ardından **AMD GPU hızlandırmayı kur** seçeneğini kullanın. AMD'nin [resmî TheRock / ROCm paketleri](https://github.com/ROCm/TheRock/blob/main/RELEASES.md), sabit PyTorch 2.12.0+rocm10.1.0 / torchvision 0.27.0+rocm10.1.0 sürümleriyle ayrı `venv-rocm` ortamına kurulur. Mimariye özel çekirdekler otomatik seçilir. İşlemci ortamı korunur; sistem sürücüsü değiştirilmez. İlk kurulum birkaç GB daha indirir; üretim tamamen yereldir. Diğer kartlar ve macOS bu sürümde doğrulanmış GPU desteği olarak sunulmaz; işlemci yolu kullanılabilir.
+
+Windows 10, RX 6700 XT (gfx1031, 12 GB) üzerinde gerçek Hunyuan3D üretimi doğrulandı. Aynı çaydanlık görseli, varyasyon 42, hızlı taslak ve 100 mm için önceki işlemci akışı **448,493 sn**, GPU çıkarımı **159,372 sn** sürdü (yaklaşık **2,8 kat**; işlemci ölçümü ayrıca önizleme/çıktı kontrollerini içerir). GPU çıktısı 208.808 üçgenli, kapalı, tutarlı yüz yönlerine sahip ve 100 mm'dir. İşlemci çıktısıyla sınırlar 0,05 mm içinde, hacim farkı %0,001'in altındadır. Sayısal yuvarlama nedeniyle birebir aynı üçgen sayısı beklenmez. Süre görsele, ayrıntı seçimine ve donanıma göre değişir.
+
+SD-Turbo görsel üretimi, Hunyuan görüntü kodlayıcısı, biçim modeli ve yüzey çözücüsü GPU'ya taşınır. Bileşenler sırayla yüklenir; dikkat hesaplaması bellek sınırına göre parçalanır. Çeviri, arka plan ayırma, yüzey temizleme, dosya hazırlama ve mevcut model kesim/doldurma işlemleri işlemcide kalır. 3D önizleme zaten donanım hızlandırmalı WebGL kullanır. Bu güncelleme bütün RAM/CPU kullanımını sıfırlamaz.
+
+Otomatik seçimde GPU hatası olursa aynı referans, varyasyon ve yükseklikle işlemcide bir kez yeniden denenir; arayüz bu dönüşü gösterir. Zorunlu ekran kartı seçiminde hata doğrudan gösterilir. İptal edilmiş işlem yeniden başlatılmaz. Son kullanıcı modeli test/karşılaştırma sırasında değiştirilmez. `tests/gpu-attention.py` parçalı dikkat sonucunu PyTorch ile karşılaştırır; Node testleri seçim, işlemciye geri dönüş ve iptali sınar.

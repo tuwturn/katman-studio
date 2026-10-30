@@ -23,9 +23,9 @@ export function initLocalAI({onEdit,onModelReady}){
  function approved(){return reference&&(reference.source==='upload'?!$('ai-prompt').value.trim():$('ai-prompt').value.trim()===reference.prompt&&$('ai-language').value===reference.language);}
  function updateButtons(busy,ready){
   busy=busy||preparing;
-  lastBusy=busy;$('ai-generate').disabled=busy||!ready;$('ai-build').disabled=busy||!ready||!approved();$('ai-install').disabled=busy;$('ai-cancel').hidden=!busy;
+  lastBusy=busy;$('ai-generate').disabled=busy||!ready;$('ai-build').disabled=busy||!ready||!approved();$('ai-install').disabled=busy;$('ai-install-gpu').disabled=busy||!ready;$('ai-cancel').hidden=!busy;
   for(const id of ['ai-edit','ai-export'])$(id).disabled=busy||!part||!loadedId;
-  for(const id of ['ai-prompt','ai-language','ai-height','ai-quality','ai-seed','ai-remove-background'])$(id).disabled=busy;
+  for(const id of ['ai-prompt','ai-language','ai-height','ai-quality','ai-seed','ai-remove-background','ai-compute'])$(id).disabled=busy;
   $('ai-upload').disabled=busy||!ready;$('ai-image-file').disabled=busy||!ready;
   onModelReady?.(!!part&&!!loadedId&&!busy);
  }
@@ -33,13 +33,13 @@ export function initLocalAI({onEdit,onModelReady}){
  async function poll(){
   clearTimeout(timer);
   try{
-   const state=await bridge('status');lastReady=state.ready;$('ai-engine-state').textContent=state.ready?'Yeni yerel motor hazır · İşlemci':'Yeni yerel motor kurulumu gerekli';updateButtons(state.busy||pending,state.ready);
+   const state=await bridge('status');lastReady=state.ready;$('ai-engine-state').textContent=state.ready?'Yerel motor hazır · '+(state.gpu?.name||'İşlemci'):'Yeni yerel motor kurulumu gerekli';$('ai-install-gpu').hidden=!state.gpuInstallSupported;$('ai-install-gpu').textContent=state.gpu?'AMD GPU kurulumunu doğrula':'AMD GPU hızlandırmayı kur';$('ai-compute').querySelector('[value="gpu"]').disabled=!state.gpu;$('ai-device').textContent=(state.job?.state==='running'&&state.job?.device?'Çalışan aygıt: '+state.job.device:state.gpu?'Otomatik seçim ekran kartını kullanır.':'Otomatik seçim işlemciyi kullanır.')+(state.job?.fallback?' GPU işlemi başarısız oldu; işlemciye dönüldü.':'');updateButtons(state.busy||pending,state.ready);
    const job=state.job;
    if(job?.id!==reportedJobId){reportedJobId=job?.id;localError=null;}
    if(job&&!localError){
     $('ai-state').classList.toggle('ai-state-error',job.state==='failed');$('ai-state').textContent=job.message;
     $('ai-elapsed').textContent=job.state==='running'?`${Math.floor((Date.now()-job.started)/1000)} sn · uygulamayı kullanmaya devam edebilirsiniz.`:'';
-    if(job.progress!==undefined&&(job.kind==='install'||['concept','sample'].includes(job.phase)))$('ai-progress').value=job.progress;else $('ai-progress').removeAttribute('value');$('ai-progress').hidden=!state.busy;
+    if(job.progress!==undefined&&(job.kind.startsWith('install')||['concept','sample'].includes(job.phase)))$('ai-progress').value=job.progress;else $('ai-progress').removeAttribute('value');$('ai-progress').hidden=!state.busy;
     if(job.translated)$('ai-translated').textContent='Yerel çeviri: '+job.translated;
    }
    if(state.reference&&referenceId!==state.reference.id){
@@ -67,8 +67,8 @@ export function initLocalAI({onEdit,onModelReady}){
   catch(e){pending=false;updateButtons(false,lastReady);error(e);return;}finally{pending=false;}
   await poll();
  }
- function options(){const rawSeed=$('ai-seed').value;return{prompt:$('ai-prompt').value.trim(),language:$('ai-language').value,height:Number($('ai-height').value),quality:$('ai-quality').value,seed:rawSeed===''?Math.floor(Math.random()*2**31):Number(rawSeed)};}
- $('ai-install').onclick=()=>run('install');$('ai-cancel').onclick=async()=>{try{await bridge('cancel');await poll();}catch(e){error(e);}};
+ function options(){const rawSeed=$('ai-seed').value;return{compute:$('ai-compute').value,prompt:$('ai-prompt').value.trim(),language:$('ai-language').value,height:Number($('ai-height').value),quality:$('ai-quality').value,seed:rawSeed===''?Math.floor(Math.random()*2**31):Number(rawSeed)};}
+ $('ai-install').onclick=()=>run('install');$('ai-install-gpu').onclick=()=>run('install-gpu');$('ai-cancel').onclick=async()=>{try{await bridge('cancel');await poll();}catch(e){error(e);}};
  $('ai-generate').onclick=()=>{const data=options();if(!data.prompt)return error(new Error('Önce üretilecek nesneyi tarif edin.'));run('concept',data);};
  async function upload(file){
   if(!file||lastBusy||pending||preparing||!lastReady)return;
