@@ -1,0 +1,2 @@
+export function isTextEntry(element){return !!element&&(element.isContentEditable||element.tagName==='TEXTAREA'||element.tagName==='INPUT'&&!['button','checkbox','radio','file','range','submit','reset'].includes(element.type));}
+export function historyKey(event){if(!(event.ctrlKey||event.metaKey)||event.altKey)return null;const key=event.key.toLowerCase();return key==='z'?(event.shiftKey?'redo':'undo'):key==='y'?'redo':null;}

@@ -1,4 +1,4 @@
-# Katman Studio 3.6 — Otomatik görselden vektör ve 3D
+# Katman Studio 3.7 — Otomatik görselden vektör ve 3D
 
 Uygulama boş açılır. Görseli ekleyin; renk ayrımı, düzgün vektör eğrileri ve ayrıntı kalitesi otomatik hazırlanır. Piksel çözünürlüğü, kenar filtresi, gölge veya Z büyütme ayarı yapmanız gerekmez.
 
@@ -135,3 +135,11 @@ Sabit görünüm sürekli çizilmez; kamera/alan/model değiştiğinde çizilir 
 Kusurlu kaynak ağlarda kesim sınıflandırıcısı, seçime kısmen giren uzun yüzeylerin dışarıdaki parçalarını kaybedebiliyordu. Yerel kesim/düzleme artık kaynak üçgenleri seçim prizmasının sınırlarında böler; dış parçalar kaynak koordinatları ve renkleriyle korunur. Kesim kapakları da gerçek seçim sınırına kırpılır. İçbükey, daire, eğik ve örtüşen alanlar desteklenir. Kusurlu kaynağın tamamının onarıldığı veya çıktının kapalı katı olduğu iddia edilmez; mevcut ağ uyarısı sürer. Taralı alanın içinde kalan çerçeve ve diğer geometri kesime dahildir.
 
 Gerçek dosyada çerçeveye taşan seçim regresyonu: `TEST_MODEL` Gallardo 3MF yolunu, `TEST_CUT_INSET=1` içeri taşan alanı seçer; `node tests/mesh-real-edit.mjs` STL çıktısında uzun yüzeylerin dış kısımlarını en yakın yüzey mesafesiyle kontrol eder. `KATMAN_NATIVE=1` masaüstü EXE üzerinde aynı testi çalıştırır. `tests/mesh-clip.test.mjs` uzun üçgenleri, eğik/çokgen/daire kesimleri, renk interpolasyonunu ve örtüşen kapakları kontrol eder.
+
+## 3.7 — Ctrl+Z ve gölgeli derinlik görünümü
+
+Masaüstü Ctrl+Z / ⌘Z, 3D düzenleyicinin geçmişine yönlendirilir. Çizim sırasında son nokta veya kapalı alan, işlem sonrasında geometri geri alınır. Ctrl+Y veya Ctrl+Shift+Z / ⌘Shift+Z yineler; Düzen menüsü de aynı geçmişi kullanır. Metin/sayı girişlerinde geri alma alanın kendi metnini düzenler. Menü ve klavye yolları tek adım uygular; araç çubuğu veya açılır liste odağı kısayolu engellemez.
+
+Gölge / derinlik anahtarı varsayılan açıktır. Yönlü ışık, daha düşük ortam aydınlatması, yüzeyler arası ve zemine düşen yumuşak gölgeler derinlik algısını artırır. Işık kadrajı modele uyar. Gölge haritası model/ışık/kesit değişince yenilenir; sabit görünüm sürekli çizilmez. Bu görsel efektler STL/3MF/OBJ geometrisine eklenmez.
+
+`tests/mesh-fill-ui.mjs` gerçek klavye ile nokta, alan ve iki ardışık geometri işleminin tek tek geri alınıp yinelenmesini; masaüstü menüsünü, metin alanını ve gölge açıp kapatmanın STL’yi değiştirmediğini doğrular.

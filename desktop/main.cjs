@@ -10,8 +10,9 @@ let window;
 const root=path.resolve(__dirname,'../public');
 const action = async name => {if(!window)await createWindow();window?.webContents.send('katman:action',name);};
 async function createWindow(){
-  const win=new BrowserWindow({width:1460,height:960,minWidth:1060,minHeight:700,show:false,backgroundColor:'#101216',title:'Katman Studio 3.6',icon:path.join(root,'icon.png'),titleBarStyle:'hidden',...(isMac?{trafficLightPosition:{x:14,y:12}}:{titleBarOverlay:{color:'#121419',symbolColor:'#9baac4',height:37}}),webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
+  const win=new BrowserWindow({width:1460,height:960,minWidth:1060,minHeight:700,show:false,backgroundColor:'#101216',title:'Katman Studio 3.7',icon:path.join(root,'icon.png'),titleBarStyle:'hidden',...(isMac?{trafficLightPosition:{x:14,y:12}}:{titleBarOverlay:{color:'#121419',symbolColor:'#9baac4',height:37}}),webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
   window=win;
+  win.webContents.on('before-input-event',(event,input)=>{if(input.type!=='keyDown'||!(input.control||input.meta)||input.alt)return;const key=input.key.toLowerCase();if(key==='z'||key==='y'){event.preventDefault();win.webContents.send('katman:action',key==='y'||input.shift?'redo':'undo');}});
   if(!isMac)win.setMenuBarVisibility(false);
   win.webContents.setWindowOpenHandler(()=>({action:'deny'}));
   win.webContents.on('will-navigate',(event,url)=>{if(!url.startsWith('katman://app/'))event.preventDefault();});
@@ -30,7 +31,7 @@ app.whenReady().then(async()=>{
   const menu=Menu.buildFromTemplate([
     ...(isMac?[{label:'Katman Studio',submenu:[{role:'about',label:'Katman Studio Hakkında'},{type:'separator'},{role:'services',label:'Servisler'},{type:'separator'},{role:'hide',label:'Katman Studio’yu Gizle'},{role:'hideOthers',label:'Diğerlerini Gizle'},{role:'unhide',label:'Tümünü Göster'},{type:'separator'},{role:'quit',label:'Katman Studio’dan Çık'}]}]:[]),
     {label:'Dosya',submenu:[{label:'Görsel ekle…',accelerator:'CmdOrCtrl+O',click:()=>action('image')},{label:'Proje aç…',accelerator:'CmdOrCtrl+Shift+O',click:()=>action('open')},{label:'Projeyi kaydet…',accelerator:'CmdOrCtrl+S',click:()=>action('save')},{type:'separator'},{label:'Dışa aktar…',accelerator:'CmdOrCtrl+E',click:()=>action('export')},{type:'separator'},isMac?{role:'close',label:'Pencereyi Kapat'}:{role:'quit',label:'Çıkış'}]},
-    {label:'Düzen',submenu:[{role:'undo',label:'Geri Al'},{role:'redo',label:'Yinele'},{type:'separator'},{role:'cut',label:'Kes'},{role:'copy',label:'Kopyala'},{role:'paste',label:'Yapıştır'},{role:'selectAll',label:'Tümünü Seç'}]},
+    {label:'Düzen',submenu:[{label:'Geri Al',accelerator:'CmdOrCtrl+Z',click:()=>action('undo')},{label:'Yinele',accelerator:isMac?'Cmd+Shift+Z':'Ctrl+Y',click:()=>action('redo')},{type:'separator'},{role:'cut',label:'Kes'},{role:'copy',label:'Kopyala'},{role:'paste',label:'Yapıştır'},{role:'selectAll',label:'Tümünü Seç'}]},
     {label:'Görünüm',submenu:[{role:'reload',label:'Yenile'},{role:'togglefullscreen',label:'Tam ekran'}]},
     ...(isMac?[{role:'windowMenu',label:'Pencere'}]:[]),
     {label:'Yardım',submenu:[{label:'Kullanım rehberi',click:()=>action('help')}]}]);

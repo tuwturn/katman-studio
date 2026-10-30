@@ -3,3 +3,7 @@
 .model-tools{display:flex;flex-direction:column;padding:0;overflow:hidden;min-height:0}.model-tool-scroll{flex:1;min-height:0;overflow:auto;padding:16px;scrollbar-width:thin}.model-actions{padding:8px 16px 12px;border-top:1px solid #3c4b62;background:#1c2636;flex-shrink:0}.model-actions .hint{font-size:9px;margin:5px 0 0}.model-actions button{padding:8px}.model-actions .row{margin-bottom:3px}.model-actions .row button{font-size:9px;padding:6px}.model-actions strong{font-size:9px}.tools button{padding:8px;margin:3px 0}
 
 #operation-feedback{padding:12px;margin:8px 0;border:1px solid #6384ae;border-radius:8px;background:#23324b;color:#e8f0ff;line-height:1.5;overflow-wrap:anywhere}#operation-feedback[data-state="error"]{border-color:#f07c7c;background:#48272f;color:#ffe0e0}#operation-feedback[data-state="warning"]{border-color:#d8a64b;background:#443721;color:#ffe5b1}#operation-feedback[data-state="success"]{border-color:#59b995;background:#203d37;color:#c4f8e4}#operation-feedback[data-state="busy"]:before{content:"";display:inline-block;width:12px;height:12px;border:2px solid #ffffff40;border-top-color:#fff;border-radius:50%;animation:operation-spin .8s linear infinite;margin-right:8px}@keyframes operation-spin{to{transform:rotate(360deg)}}#operation-elapsed{color:#b8c9e3;font-size:12px}
+
+.viewbar .shadow-switch{display:flex;align-items:center;gap:6px;white-space:nowrap;margin:0 12px 0 0;color:#bdd0ec;font-size:10px}.shadow-switch input{accent-color:#9bbdff}
+
+.viewbar{flex-wrap:wrap;height:auto;min-height:44px;padding-top:5px;padding-bottom:5px}

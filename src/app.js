@@ -1,3 +1,4 @@
+import {historyKey,isTextEntry} from './editor-history.js';
 import {demandRenderer} from './demand-render.js';
 import {backgroundRemoved,regionVisible} from './background.js';
 import * as THREE from 'three';
@@ -101,7 +102,7 @@ $('import-image').onclick=$('empty-import').onclick=()=>$('file').click();
 // Native menu accelerators handle these keys in Electron. Handling the same
 // event here too can open two dialogs or save the project twice on macOS.
 if(!window.katmanDesktop)document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&['o','s'].includes(e.key.toLowerCase())){e.preventDefault();if(meshEditing){editorAction(e.key.toLowerCase()==='s'?'save':'open');return;}if(e.key.toLowerCase()==='s')saveProject();else if(e.shiftKey)$('project-file').click();else $('file').click();}});
-if(window.katmanDesktop){document.body.classList.add('native');if(window.katmanDesktop.platform==='darwin'){document.body.classList.add('mac');const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);for(let node;node=walker.nextNode();)if(node.parentElement.tagName!=='SCRIPT'&&node.nodeValue.includes('Ctrl'))node.nodeValue=node.nodeValue.replaceAll('Ctrl','⌘');}window.katmanDesktop.onAction(action=>{if(meshEditing){editorAction(action);return;}const ids={image:'file',open:'project-file',save:'save-project',export:'export',help:'help'};if(ids[action])$(ids[action]).click();});}
+if(window.katmanDesktop){document.body.classList.add('native');if(window.katmanDesktop.platform==='darwin'){document.body.classList.add('mac');const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);for(let node;node=walker.nextNode();)if(node.parentElement.tagName!=='SCRIPT'&&node.nodeValue.includes('Ctrl'))node.nodeValue=node.nodeValue.replaceAll('Ctrl','⌘');}window.katmanDesktop.onAction(action=>{if(!meshEditing&&['undo','redo'].includes(action)){if(isTextEntry(document.activeElement))document.execCommand(action);return;}if(meshEditing){editorAction(action);return;}const ids={image:'file',open:'project-file',save:'save-project',export:'export',help:'help'};if(ids[action])$(ids[action]).click();});}
 function setWorkspace2D(value){workspace2d=value;invalidateScene();$('workspace-2d').hidden=!value;$('view-2d').classList.toggle('active',value);if(value){$('view-top').classList.remove('active');$('view-perspective').classList.remove('active');drawSource();}}
 $('view-2d').onclick=()=>setWorkspace2D(true);
 $('workspace-scope').onchange=()=>{selectionScope=$('workspace-scope').value;$('tolerance-wrap').hidden=selectionScope!=='range';};
@@ -117,7 +118,10 @@ workCanvas.onpointercancel=()=>{drag2d=null;$('selection-box').hidden=true;};
 init3D();setBusy(false);
 
 const meshFrame=$('mesh-editor-frame');
-function editorAction(action){meshFrame.contentWindow?.postMessage({type:'katman-editor-action',action},location.origin);}
+function editorAction(action){meshFrame.contentWindow?.postMessage({type:'katman-editor-action',action,allowText:document.activeElement===meshFrame},location.origin);}
 function showEditor(value){meshEditing=value;invalidateScene();document.querySelector('main.workspace').hidden=value;$('mesh-editor-host').hidden=!value;$('mode-mesh-editor').classList.toggle('active',value);$('mode-image-editor').classList.toggle('active',!value);if(value&&!meshFrame.getAttribute('src'))meshFrame.src='mesh-editor.html';$('save-project').disabled=value?false:busy||!project;$('import-image').firstChild.textContent=value?'＋ 3D dosyası aç ':'＋ Görsel ekle ';$('open-project').hidden=value;}
 $('mode-mesh-editor').onclick=()=>showEditor(true);$('mode-image-editor').onclick=()=>showEditor(false);
 document.addEventListener('click',e=>{if(!meshEditing)return;const button=e.target.closest('button'),actions={'import-image':'image','open-project':'open','save-project':'save','export':'export','help':'help'};if(actions[button?.id]){e.preventDefault();e.stopImmediatePropagation();editorAction(actions[button.id]);}},true);
+
+// Browser shortcuts also reach the 3D editor when the toolbar has focus.
+document.addEventListener('keydown',event=>{if(!meshEditing)return;const action=historyKey(event);if(action&&!isTextEntry(event.target)){event.preventDefault();editorAction(action);}});
