@@ -7,10 +7,32 @@ sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[1]/'local-ai'))
 from production_cache import ProductionCache,key_for
 from reference_image import prepare_reference,FaithfulImageProcessor
 from gpu_runtime import dtype_for
-from generate_v2 import import_image
+from generate_v2 import import_image,build_image_prompt,concept,normalize_translated_subject
 import torch
 
 class ProductionTests(unittest.TestCase):
+    def test_single_word_person_is_disambiguated_without_replacing_explicit_anatomy(self):
+        self.assertEqual(normalize_translated_subject('human'),'a person')
+        self.assertEqual(normalize_translated_subject('human skeleton'),'human skeleton')
+        self.assertEqual(normalize_translated_subject('a human-shaped glass sculpture'),'a human-shaped glass sculpture')
+    def test_xl_rejects_insufficient_cpu_ram_before_loading_weights(self):
+        from diffusers import StableDiffusionXLPipeline
+        with tempfile.TemporaryDirectory() as home:
+            root=pathlib.Path(home);model=root/'models-v2/image-xl';output=root/'output';output.mkdir()
+            for folder,name in [('unet','diffusion_pytorch_model.fp16.safetensors'),('vae','diffusion_pytorch_model.fp16.safetensors'),('text_encoder','model.fp16.safetensors'),('text_encoder_2','model.fp16.safetensors')]:
+                path=model/folder/name;path.parent.mkdir(parents=True,exist_ok=True);path.touch()
+            with patch('psutil.virtual_memory',return_value=types.SimpleNamespace(total=8*1024**3,available=4*1024**3)),patch.object(StableDiffusionXLPipeline,'from_pretrained') as load:
+                with self.assertRaisesRegex(RuntimeError,'24 GB RAM'):concept(root,{'imageEngine':'xl','backend':'cpu','prompt':'a chair','language':'en','seed':42,'precision':'auto'},output)
+                load.assert_not_called()
+
+    def test_prompt_does_not_invent_material_or_pattern_but_keeps_user_requests(self):
+        human=build_image_prompt('human')
+        self.assertIn('showing human,',human)
+        for forbidden in ['intricate','sculpture','product photograph','texture','woven','metallic']:
+            self.assertNotIn(forbidden,human)
+        self.assertIn('a woven basket,',build_image_prompt('a woven basket'))
+        self.assertIn('a realistic person in cotton clothes,',build_image_prompt('a realistic person in cotton clothes'))
+        self.assertNotIn('color image',build_image_prompt('a monochrome pencil sketch of a chair'))
     def test_background_reuse_keeps_a_new_reference_name_and_seed(self):
         image=Image.new('RGBA',(32,32),(100,120,180,255));stream=io.BytesIO();image.save(stream,format='PNG')
         separated=image.copy();alpha=Image.new('L',(32,32));alpha.paste(255,(8,8,24,24));separated.putalpha(alpha)

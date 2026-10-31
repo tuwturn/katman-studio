@@ -20,30 +20,30 @@ export function initLocalAI({onEdit,onModelReady}){
   loadedId=event.data.token;$('ai-result').textContent=part?`${part.vertices.length.toLocaleString('tr-TR')} köşe · ${part.triangles.length.toLocaleString('tr-TR')} üçgen`:'';
   $('ai-state').textContent='3D model hazır. Kontrol görseliyle karşılaştırıp kaydedebilirsiniz.';updateButtons(lastBusy,lastReady);
  });
- function approved(){return reference&&(reference.source==='upload'?!$('ai-prompt').value.trim():$('ai-prompt').value.trim()===reference.prompt&&$('ai-language').value===reference.language);}
+ function approved(){return reference&&(reference.source==='upload'?!$('ai-prompt').value.trim():$('ai-prompt').value.trim()===reference.prompt&&$('ai-language').value===reference.language&&($('ai-image-engine').value==='auto'||$('ai-image-engine').value===(reference.imageEngine||'turbo')));}
  function updateButtons(busy,ready){
   busy=busy||preparing;
-  lastBusy=busy;$('ai-generate').disabled=busy||!ready;$('ai-build').disabled=busy||!ready||!approved();$('ai-install').disabled=busy;$('ai-install-gpu').disabled=busy||!ready;$('ai-install-quality').disabled=busy||!ready;$('ai-cancel').hidden=!busy;
+  lastBusy=busy;$('ai-generate').disabled=busy||!ready;$('ai-build').disabled=busy||!ready||!approved();$('ai-install').disabled=busy;$('ai-install-gpu').disabled=busy||!ready;$('ai-install-quality').disabled=busy||!ready;$('ai-install-image-xl').disabled=busy||!ready;$('ai-cancel').hidden=!busy;
   for(const id of ['ai-edit','ai-export'])$(id).disabled=busy||!part||!loadedId;
-  for(const id of ['ai-prompt','ai-language','ai-height','ai-quality','ai-seed','ai-remove-background','ai-compute','ai-precision'])$(id).disabled=busy;
+  for(const id of ['ai-prompt','ai-language','ai-height','ai-quality','ai-seed','ai-remove-background','ai-compute','ai-precision','ai-image-engine'])$(id).disabled=busy;
   $('ai-upload').disabled=busy||!ready;$('ai-image-file').disabled=busy||!ready;
   onModelReady?.(!!part&&!!loadedId&&!busy);
  }
- for(const id of ['ai-prompt','ai-language'])$(id).addEventListener('input',()=>updateButtons(lastBusy,lastReady));
+ for(const id of ['ai-prompt','ai-language','ai-image-engine'])$(id).addEventListener('input',()=>updateButtons(lastBusy,lastReady));
  async function poll(){
   clearTimeout(timer);
   try{
-   const state=await bridge('status');lastReady=state.ready;$('ai-engine-state').textContent=state.ready?'Yerel motor hazır · '+(state.gpu?.name||'İşlemci'):'Yeni yerel motor kurulumu gerekli';$('ai-install').hidden=!!state.ready;$('ai-setup-note').hidden=!!state.ready;$('ai-optional-models').hidden=!!state.qualityReady;$('ai-install-gpu').hidden=!!state.gpu||!state.gpuInstallSupported;$('ai-install-gpu').textContent=state.gpu?'GPU kurulumunu doğrula':'Donanıma uygun GPU motorunu kur';$('ai-compute').querySelector('[value="gpu"]').disabled=!state.gpu;$('ai-quality').querySelector('[value="fidelity"]').disabled=!state.qualityReady;$('ai-install-quality').hidden=!!state.qualityReady;$('ai-device').textContent=(state.job?.state==='running'&&state.job?.device?'Çalışan aygıt: '+state.job.device:state.gpu?'Otomatik seçim ekran kartını kullanır.':'Otomatik seçim işlemciyi kullanır.')+(state.job?.fallback?' GPU işlemi başarısız oldu; işlemciye dönüldü.':'');if(state.hardware){const h=state.hardware;$('ai-hardware').textContent='Üretim bilgisayarı: '+h.cpu+' · '+h.ramGB+' GB RAM ('+h.freeGB+' GB boş) · '+(state.busy&&state.job?.threads||h.threads)+' iş parçacığı · '+({low:'Bellek tasarrufu',balanced:'Dengeli',high:'Yüksek bellek'}[h.memoryMode]||h.memoryMode)+(state.gpu?.memoryGB?' · '+state.gpu.memoryGB+' GB GPU':'');}updateButtons(state.busy||pending,state.ready);
+   const state=await bridge('status');lastReady=state.ready;$('ai-engine-state').textContent=state.ready?'Yerel motor hazır · '+(state.gpu?.name||'İşlemci'):'Yeni yerel motor kurulumu gerekli';$('ai-install').hidden=!!state.ready;$('ai-setup-note').hidden=!!state.ready;$('ai-optional-models').hidden=!!state.qualityReady&&!!state.imageXLReady;$('ai-install-image-xl').hidden=!!state.imageXLReady;$('ai-image-engine').querySelector('[value="xl"]').disabled=!state.imageXLReady;$('ai-install-gpu').hidden=!!state.gpu||!state.gpuInstallSupported;$('ai-install-gpu').textContent=state.gpu?'GPU kurulumunu doğrula':'Donanıma uygun GPU motorunu kur';$('ai-compute').querySelector('[value="gpu"]').disabled=!state.gpu;$('ai-quality').querySelector('[value="fidelity"]').disabled=!state.qualityReady;$('ai-install-quality').hidden=!!state.qualityReady;$('ai-device').textContent=(state.job?.state==='running'&&state.job?.device?'Çalışan aygıt: '+state.job.device:state.gpu?'Otomatik seçim ekran kartını kullanır.':'Otomatik seçim işlemciyi kullanır.')+(state.job?.fallback?' GPU işlemi başarısız oldu; işlemciye dönüldü.':'');if(state.hardware){const h=state.hardware;$('ai-hardware').textContent='Üretim bilgisayarı: '+h.cpu+' · '+h.ramGB+' GB RAM ('+h.freeGB+' GB boş) · '+(state.busy&&state.job?.threads||h.threads)+' iş parçacığı · '+({low:'Bellek tasarrufu',balanced:'Dengeli',high:'Yüksek bellek'}[h.memoryMode]||h.memoryMode)+(state.gpu?.memoryGB?' · '+state.gpu.memoryGB+' GB GPU':'');}updateButtons(state.busy||pending,state.ready);
    const job=allowResults||state.job?.kind?.startsWith('install')?state.job:null;lastServerReference=state.reference?.id;
    if(job?.id!==reportedJobId){reportedJobId=job?.id;localError=null;}
    if(job&&!localError){
-    $('ai-state').classList.toggle('ai-state-error',job.state==='failed');$('ai-state').textContent=job.message;
+    $('ai-state').classList.toggle('ai-state-error',job.state==='failed');$('ai-state').textContent=job.message+(job.imageEngine?' · '+(job.imageEngine==='xl'?'SDXL-Turbo':'SD-Turbo'):'');if(job.imagePrompt){$('ai-prompt-details').hidden=false;$('ai-effective-prompt').textContent=job.imagePrompt;}
     $('ai-elapsed').textContent=job.state==='running'?`${Math.floor((Date.now()-job.started)/1000)} sn · uygulamayı kullanmaya devam edebilirsiniz.`:'';
     if(job.progress!==undefined&&(job.kind.startsWith('install')||['concept','sample'].includes(job.phase)))$('ai-progress').value=job.progress;else $('ai-progress').removeAttribute('value');$('ai-progress').hidden=!state.busy;
     if(job.translated)$('ai-translated').textContent='Yerel çeviri: '+job.translated;
    }
    if(allowResults&&state.reference&&state.reference.id!==ignoredReference&&referenceId!==state.reference.id){
-    const value=await bridge('concept-result',{id:state.reference.id});reference=value;referenceId=value.id;
+    const value=await bridge('concept-result',{id:state.reference.id});reference=value;referenceId=value.id;$('ai-image-engine-used').textContent='Kaynak: '+(value.source==='upload'?'Yüklenen görsel':value.imageEngine==='xl'?'SDXL-Turbo':'SD-Turbo');$('ai-prompt-details').hidden=value.source==='upload'||!value.imagePrompt;$('ai-effective-prompt').textContent=value.imagePrompt||'';
     if(part){part=null;loadedId=null;resultId=null;queued=null;frameReady=false;frame.src='mesh-editor.html?preview=1';view(false);$('ai-result').textContent='Henüz 3D model üretilmedi.';}
     $('ai-concept-image').src=value.image;$('ai-concept-image').hidden=false;$('ai-concept-empty').hidden=true;$('ai-concept-note').hidden=false;
     $('ai-preview-name').textContent=value.prompt;
@@ -67,8 +67,8 @@ export function initLocalAI({onEdit,onModelReady}){
   catch(e){pending=false;updateButtons(false,lastReady);error(e);return;}finally{pending=false;}
   await poll();
  }
- function options(){const rawSeed=$('ai-seed').value;return{compute:$('ai-compute').value,precision:$('ai-precision').value,prompt:$('ai-prompt').value.trim(),language:$('ai-language').value,height:Number($('ai-height').value),quality:$('ai-quality').value,seed:rawSeed===''?undefined:Number(rawSeed)};}
- $('ai-install').onclick=()=>run('install');$('ai-install-gpu').onclick=()=>run('install-gpu');$('ai-install-quality').onclick=()=>run('install-quality');$('ai-cancel').onclick=async()=>{try{await bridge('cancel');await poll();}catch(e){error(e);}};
+ function options(){const rawSeed=$('ai-seed').value;return{imageEngine:$('ai-image-engine').value,compute:$('ai-compute').value,precision:$('ai-precision').value,prompt:$('ai-prompt').value.trim(),language:$('ai-language').value,height:Number($('ai-height').value),quality:$('ai-quality').value,seed:rawSeed===''?undefined:Number(rawSeed)};}
+ $('ai-install').onclick=()=>run('install');$('ai-install-gpu').onclick=()=>run('install-gpu');$('ai-install-quality').onclick=()=>run('install-quality');$('ai-install-image-xl').onclick=()=>run('install-image-xl');$('ai-cancel').onclick=async()=>{try{await bridge('cancel');await poll();}catch(e){error(e);}};
  $('ai-generate').onclick=()=>{const data=options();if(!data.prompt)return error(new Error('Önce üretilecek nesneyi tarif edin.'));run('concept',data);};
  async function upload(file){
   if(!file||lastBusy||pending||preparing||!lastReady)return;

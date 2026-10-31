@@ -2,7 +2,25 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {previewProfile} from '../src/performance-profile.js';
-const require=createRequire(import.meta.url),{policy,backendFor}=require('../desktop/hardware.cjs');
+const require=createRequire(import.meta.url),{policy,backendFor,imageEngineFor,precisionRetry}=require('../desktop/hardware.cjs');
+test('precision retry respects explicit XL choice and retains reference and variation',()=>{
+ const input={imageEngine:'xl',imageMode:'auto',seed:42,referenceId:'same-reference',precision:'auto'};
+ const low=precisionRetry(input,{ramGB:16});assert.equal(low.imageEngine,'turbo');assert.equal(low.precision,'float32');assert.equal(low.seed,42);assert.equal(low.referenceId,input.referenceId);
+ assert.equal(precisionRetry({...input,imageMode:'xl'},{ramGB:16}).imageEngine,'xl');
+ assert.equal(precisionRetry(input,{ramGB:32}).imageEngine,'xl');
+});
+test('image engine selects XL only when installed and hardware capacity permits',()=>{
+ const resources={ramGB:16,freeGB:6};
+ assert.equal(imageEngineFor({installed:true,gpu:{memoryGB:12},resources}),'xl');
+ assert.equal(imageEngineFor({installed:false,gpu:{memoryGB:12},resources}),'turbo');
+ assert.equal(imageEngineFor({installed:true,gpu:{memoryGB:4},resources}),'turbo');
+ assert.equal(imageEngineFor({requested:'xl',installed:true,gpu:{memoryGB:4},resources}),'xl');
+ assert.equal(imageEngineFor({installed:true,gpu:{memoryGB:12},resources:{ramGB:8,freeGB:5}}),'turbo');
+ assert.throws(()=>imageEngineFor({requested:'xl',installed:true,resources}),/RAM/);
+ assert.throws(()=>imageEngineFor({requested:'xl',installed:false,resources}),/kurun/);
+ assert.equal(imageEngineFor({installed:true,resources:{ramGB:32,freeGB:20}}),'xl');
+ assert.equal(imageEngineFor({installed:true,gpu:{memoryGB:12},resources,precision:'float32'}),'turbo');
+});
 const gib=1024**3;
 test('resource policy adapts to total RAM, available RAM and CPU count without changing geometry quality',()=>{
  const small=policy({total:8*gib,free:2*gib,cores:4}),large=policy({total:64*gib,free:40*gib,cores:32}),pressured=policy({total:64*gib,free:2*gib,cores:32});

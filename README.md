@@ -1,6 +1,20 @@
-# Katman Studio 3.14 — Otomatik görselden vektör ve 3D
+# Katman Studio 3.15 — Otomatik görselden vektör ve 3D
 
 Uygulama boş açılır. Görseli ekleyin; renk ayrımı, düzgün vektör eğrileri ve ayrıntı kalitesi otomatik hazırlanır. Piksel çözünürlüğü, kenar filtresi, gölge veya Z büyütme ayarı yapmanız gerekmez.
+
+## 3.15 — Kontrol görselinde daha güçlü yerel motor
+
+Önceki SD-Turbo akışında otomatik eklenen `intricate details`, heykel ve ürün fotoğrafı yönlendirmeleri istenmeyen yüzey görünümünü etkiliyordu. Bunlar kaldırıldı. Aynı sorunlu “insan” isteği CPU ve GPU tam hassasiyette de benzer kaba doku üretti; indirilen SD-Turbo dosyalarının tamamı resmî sabit revizyonla eşleşti. Yalnızca hassasiyet veya daha çok adım sorunu çözmedi. Hafif SD-Turbo artık 1 adım kullanır; bu örneklerde 4 adım daha fazla tekrarlı doku oluşturdu.
+
+Yeni **Görsel motoru** seçeneği daha güçlü [SDXL-Turbo](https://huggingface.co/stabilityai/sdxl-turbo) modelini 4 adımda yerelde çalıştırır. İsteğe bağlı kurulum yaklaşık 7 GB indirir; API anahtarı veya bulut üretimi gerekmez. Modelin kendi lisans koşulları geçerlidir. Dosyalar sabit `71153311d3dbb46851df1931d3ca6e939de83304` revizyonundan indirilir ve SHA-256 doğrulanır. Kurulum tamamlanmadan motor hazır sayılmaz. İndirici aralık indirmesini ve yarım dosyadan devam etmeyi korur.
+
+**Otomatik** seçim, SDXL kuruluysa ve uygun bellek varsa onu kullanır: GPU için yaklaşık 16 GB RAM / 8 GB VRAM; CPU için en az 24 GB RAM ve 16 GB boş bellek. Açık SDXL seçiminde 4 GB VRAM ile bileşenleri sırayla taşıma denenebilir; bu alt sınır her kartta başarı veya hız garantisi değildir. GPU FP16, bellek durumuna göre CPU aktarımı, attention/VAE bellek tasarrufu kullanılır. Tam hassasiyet daha çok RAM ister. Otomatik modda FP16 başarısız olursa ve tam SDXL için RAM yetmezse hafif motora geçildiği açıkça bildirilir. Kullanıcı açıkça SDXL seçtiyse gizlice başka görsel motoruna geçilmez. CPU/NVIDIA/AMD yönlendirmeleri korunur; bu sürümün gerçek SDXL denemesi Windows RX 6700 XT / 16 GB RAM üzerinde yapıldı.
+
+Kaynak motor adı kontrol görselinin yanında görünür; uygulanan tam tarif ayrıca açılabilir. Yalnızca tek başına çevrilmiş `human` / `human being`, belirsiz anatomi çağrışımını azaltmak için `a person` olur; `human skeleton` gibi açık tarifler korunur. Hazır insan/ördek şekli seçilmez. Kullanıcının malzeme ve siyah-beyaz isteği korunur; otomatik özel malzeme eklenmez. Motor, adım ve yeni tarif sürümü önbellek anahtarına dahildir; eski sorunlu görsel yeni üretimde kullanılmaz. Yüklenen fotoğraf bu görsel motorunda tekrar çizilmez.
+
+**Gerçek doğrulama:** Aynı “insan” isteği ve aynı varyasyon numarası, paketli masaüstü arayüzünde normal kıyafetli bir kişi üretti; eski örgü görünümü görülmedi. Kontrol görseli 38,052 saniye, Hunyuan taslak 3D üretimi 66,060 saniye sürdü. 78.270 üçgenli model STL ve 3MF olarak kaydedildi. STL tekrar açıldığında 100 mm ve tutarlı yüz yönleri doğrulandı; bu örnek kapalı katı değildi (2 sınır ve 4 çoklu bağlantılı kenar). Kapalı/baskıya hazır geometri garantisi verilmez. Sandalye denemesi doğal çıktı; ayrı şapkalı ördek denemesinde çift baş hatası vardı. Daha güçlü motor anatomiyi, bütün tarifleri veya görünmeyen yüzeyleri kusursuz yapmaz. 3D çıktı hâlâ tek renk geometridir; doku boyama eklenmedi.
+
+Boş açılış, tamamlanan kurulumları gizleme, görselden vektör/kabartma ve ayrı 3D düzenleme alanları korunur. Eski görseller diskte tutulur; yeni motorla sonuç görmek için yeniden üretin.
 
 ## Açma
 

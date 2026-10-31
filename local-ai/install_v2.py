@@ -5,6 +5,7 @@ from install import download, private_python, report, run
 SOURCE = 'f8db63096c8282cb27354314d896feba5ba6ff8a'
 SHAPE = 'f90a0f7df7d5e6f71109cf333f6a95a0ae3194a6'
 IMAGE = 'b261bac6fd2cf515557d5d0707481eafa0485ec2'
+IMAGE_XL = '71153311d3dbb46851df1931d3ca6e939de83304'
 
 def file_hash(path):
     digest=hashlib.sha256()
@@ -104,9 +105,17 @@ def repo_download(repo,revision,root,patterns,reuse=False):
             if candidates:shutil.copyfile(candidates[0],partial)
         offset=partial.stat().st_size if partial.exists() else 0
         if offset>size:partial.write_bytes(b'');offset=0
+        # Resolve the signed whole-file CDN URL once. Repeating /resolve for every
+        # chunk can dominate large downloads; range bounds and final SHA stay checked.
+        direct_url=None
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url+'?download=true',method='HEAD'),timeout=15) as response:
+                if response.url.startswith('https://'):direct_url=response.url
+        except Exception:pass
         def segment(start,end):
             for attempt in range(4):
-                request=urllib.request.Request(url+f'?download=true&part={start}',headers={'Range':f'bytes={start}-{end}','User-Agent':'Katman-Studio-local-ai'})
+                transfer_url=direct_url if direct_url and attempt<2 else url+f'?download=true&part={start}-{end}'
+                request=urllib.request.Request(transfer_url,headers={'Range':f'bytes={start}-{end}','User-Agent':'Katman-Studio-local-ai'})
                 try:
                     with urllib.request.urlopen(request,timeout=90) as response:
                         expected=f'bytes {start}-{end}/{size}'
@@ -117,9 +126,9 @@ def repo_download(repo,revision,root,patterns,reuse=False):
                 except Exception:
                     if attempt==3:raise
                     time.sleep(2)
-        with ThreadPoolExecutor(max_workers=3) as chunks:
+        with ThreadPoolExecutor(max_workers=6) as chunks:
             while offset<size:
-                ranges=[(start,min(start+32*1024*1024,size)-1) for start in range(offset,min(offset+96*1024*1024,size),32*1024*1024)]
+                ranges=[(start,min(start+16*1024*1024,size)-1) for start in range(offset,min(offset+96*1024*1024,size),16*1024*1024)]
                 futures=[chunks.submit(segment,start,end) for start,end in ranges]
                 for future in futures:
                     block=future.result()
@@ -179,11 +188,24 @@ def quality_models(home):
         'hunyuan3d-vae-v2-mini/config.yaml','hunyuan3d-vae-v2-mini/model.fp16.safetensors'],reuse=True)
     report('Mini kalite motoru hazır. API olmadan yerel çalışır.',ready=True)
 
+def image_xl_models(home):
+    report('SDXL-Turbo görsel motoru indiriliyor · yaklaşık 7 GB…')
+    repo_download('stabilityai/sdxl-turbo',IMAGE_XL,home/'models-v2'/'image-xl',[
+        'model_index.json','scheduler/*.json','tokenizer/*','tokenizer_2/*',
+        'text_encoder/config.json','text_encoder/model.fp16.safetensors',
+        'text_encoder_2/config.json','text_encoder_2/model.fp16.safetensors',
+        'unet/config.json','unet/diffusion_pytorch_model.fp16.safetensors',
+        'vae/config.json','vae/diffusion_pytorch_model.fp16.safetensors','LICENSE*','README.md'])
+    marker=home/'ready-image-xl.json.tmp'
+    marker.write_text(json.dumps({'engine':'sdxl-turbo','revision':IMAGE_XL}),encoding='utf-8');marker.replace(home/'ready-image-xl.json')
+    report('SDXL-Turbo görsel motoru hazır.',ready=True)
+
 if __name__=='__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('--home',required=True);parser.add_argument('--models',action='store_true');parser.add_argument('--quality-models',action='store_true');args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--home',required=True);parser.add_argument('--models',action='store_true');parser.add_argument('--quality-models',action='store_true');parser.add_argument('--image-xl-models',action='store_true');args=parser.parse_args()
     try:
         home=pathlib.Path(args.home).resolve()
-        if args.quality_models:quality_models(home)
+        if args.image_xl_models:image_xl_models(home)
+        elif args.quality_models:quality_models(home)
         elif args.models:models(home)
         else:install(home)
     except Exception as error:report(str(error),error=True);raise
