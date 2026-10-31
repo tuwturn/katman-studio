@@ -1,4 +1,4 @@
-# Katman Studio 3.13 — Otomatik görselden vektör ve 3D
+# Katman Studio 3.14 — Otomatik görselden vektör ve 3D
 
 Uygulama boş açılır. Görseli ekleyin; renk ayrımı, düzgün vektör eğrileri ve ayrıntı kalitesi otomatik hazırlanır. Piksel çözünürlüğü, kenar filtresi, gölge veya Z büyütme ayarı yapmanız gerekmez.
 
@@ -224,3 +224,14 @@ Akış aynı kalır: serbest yazıdan kontrol görseli veya yüklenen PNG/JPG/WE
 **Gerçek ölçümler:** Windows RX 6700 XT üzerinde aynı kaynak çaydanlık/varyasyon 42/100 mm için yeni hazırlamayla Turbo FP32 **117,196 sn**, otomatik FP16 **71,962 sn** sürdü. Aynı 3D yüzeyden 150 mm çıktı **4,188 sn**; aynı latent biçimden ayrıntılı yüzey **17,040 sn** sürdü. Ayrı Mini 30 adım **41,499 sn** sürdü. Son üçü birbirinden farklı işlemlerdir; önbellek süreleri yeni YZ üretim süresi olarak kıyaslanmaz. Tüm örnek geometri çıktıları kapalı, tutarlı yüz yönlerine sahip ve istenen yükseklikte doğrulandı. Tek çaydanlıkta sabit ortografik ön siluet karşılaştırması önceki Turbo hazırlamada 0,8076 IoU, yeni Turbo FP32'de 0,8182, yeni otomatikte 0,8182 ve Mini'de 0,7981 verdi. Bu yalnızca o görselin ön siluet kıyasıdır; tam 3D benzerlik/arka yüz doğruluğu puanı değildir. Mini'nin her zaman daha iyi olmadığı bu örnekte de görüldü. Yeni yazıdan kontrol görseli **38,443 sn**, aynı metin/varyasyonun tekrar açılması **1,318 sn** sürdü.
 
 Çıktı hâlâ tek renk geometridir; bu sürümde generatif doku boyama ve çok açıdan giriş motoru eklenmedi. Tek fotoğrafta görünmeyen yüzeyler tahmin edilir. Geliştirme, yazı/görselden 3D kapsamındaki hız ve girdi sadakatine odaklanır. Yeni testler `tests/production-cache.py`, `tests/model-reuse.py` ve Node yerel motor testlerindedir; mock kurulum ve arayüz testleri gerçek GPU üretimiyle karıştırılmaz.
+
+
+## 3.14 — Boş açılış, tamamlanan kurulum ve ince yüzey
+
+Masaüstü motoru açılışta `last-concept-v2.json` / `last-model-v2.json` dosyalarından görsel veya model geri yüklemez. Dosyalar silinmez. Tarayıcı/LAN oturumunda da sunucuda daha önce duran örnek, referans ve model kendiliğinden görüntülenmez; yeni sekme/sayfa yenilemesi boş başlar. Aynı açık oturum içinde kullanıcının başlattığı yükleme ve üretim normal çalışır. Ana görsel/vektör ve 3D düzenleme alanları da başlangıçta boştur.
+
+Yerel motor hazır olduğunda ana kurulum düğmesi ve ilk kurulum açıklaması gizlenir. GPU hazır olduğunda GPU kurulum düğmesi gizlenir. Eksik alternatif Mini motoru ana ekranda tekrar kurulum istemez; isteğe bağlı kapalı bir bölümden kurulabilir. Kurulum yapılırken ilerleme gösterilir; bir kurulumun yapılması diğer, isteğe bağlı motorun kurulduğu anlamına gelmez.
+
+Kontrol görseli tarifine otomatik eklenen `3D sculpture` yönlendirmesi kaldırıldı; kaynak görseli baştan heykel gibi düzleştirmek yerine keskin sınır ve yüzey ayrıntısı yönlendirmesi kullanılır. Görsel hâlâ yerel SD-Turbo modelinin 512 × 512 üretimidir; bu değişiklik yeni bir yüksek kapasiteli görsel modeli değildir ve ince ayrıntı garantisi vermez. Eski tarif düzenine ait kontrol görseli önbelleği kullanılmaz.
+
+Turbo için ayrı **İnce yüzey** seçeneği 384 çıkarım çözünürlüğü kullanır; dengeli 256, taslak 192 olarak korunur. Aynı varyasyonda mevcut latent biçim yeniden kullanılabilir. Bu seçenek üçgen sayısını artırır ve modeldeki ince yüzeyi daha sık örnekler; kayıp bir el/aksesuarı veya kaynak dokusunu yeniden tasarlamaz. Daha fazla süre ve bellek ister. Gerçek çaydanlık örneğinde 838.352 üçgen / 419.174 köşe üretildi; masaüstü önizleme ve STL/3MF dışa aktarma test edildi. Başlangıçta eski JSON dosyalarının mevcut olması ve LAN sayfasının üretimden sonra yenilenmesi otomatik testlerde özellikle sınanır.

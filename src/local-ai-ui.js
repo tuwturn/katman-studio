@@ -1,6 +1,6 @@
 const $=id=>document.getElementById(id);
 export function initLocalAI({onEdit,onModelReady}){
- let active=false,timer,pending=false,preparing=false,part=null,loadedId=null,resultId=null,frameReady=false,queued=null,lastReady=false,localError=null,reportedJobId=null,reference=null,referenceId=null,lastBusy=false;
+ let active=false,timer,pending=false,preparing=false,part=null,loadedId=null,resultId=null,frameReady=false,queued=null,lastReady=false,localError=null,reportedJobId=null,reference=null,referenceId=null,lastBusy=false,allowResults=false,ignoredReference=null,lastServerReference=null;
  const frame=$('ai-preview-frame');
  async function bridge(action,data){
   if(window.katmanDesktop?.localAI)return window.katmanDesktop.localAI(action,data);
@@ -33,8 +33,8 @@ export function initLocalAI({onEdit,onModelReady}){
  async function poll(){
   clearTimeout(timer);
   try{
-   const state=await bridge('status');lastReady=state.ready;$('ai-engine-state').textContent=state.ready?'Yerel motor hazır · '+(state.gpu?.name||'İşlemci'):'Yeni yerel motor kurulumu gerekli';$('ai-install-gpu').hidden=!state.gpuInstallSupported;$('ai-install-gpu').textContent=state.gpu?'GPU kurulumunu doğrula':'Donanıma uygun GPU motorunu kur';$('ai-compute').querySelector('[value="gpu"]').disabled=!state.gpu;$('ai-quality').querySelector('[value="fidelity"]').disabled=!state.qualityReady;$('ai-install-quality').hidden=!!state.qualityReady;$('ai-device').textContent=(state.job?.state==='running'&&state.job?.device?'Çalışan aygıt: '+state.job.device:state.gpu?'Otomatik seçim ekran kartını kullanır.':'Otomatik seçim işlemciyi kullanır.')+(state.job?.fallback?' GPU işlemi başarısız oldu; işlemciye dönüldü.':'');if(state.hardware){const h=state.hardware;$('ai-hardware').textContent='Üretim bilgisayarı: '+h.cpu+' · '+h.ramGB+' GB RAM ('+h.freeGB+' GB boş) · '+(state.busy&&state.job?.threads||h.threads)+' iş parçacığı · '+({low:'Bellek tasarrufu',balanced:'Dengeli',high:'Yüksek bellek'}[h.memoryMode]||h.memoryMode)+(state.gpu?.memoryGB?' · '+state.gpu.memoryGB+' GB GPU':'');}updateButtons(state.busy||pending,state.ready);
-   const job=state.job;
+   const state=await bridge('status');lastReady=state.ready;$('ai-engine-state').textContent=state.ready?'Yerel motor hazır · '+(state.gpu?.name||'İşlemci'):'Yeni yerel motor kurulumu gerekli';$('ai-install').hidden=!!state.ready;$('ai-setup-note').hidden=!!state.ready;$('ai-optional-models').hidden=!!state.qualityReady;$('ai-install-gpu').hidden=!!state.gpu||!state.gpuInstallSupported;$('ai-install-gpu').textContent=state.gpu?'GPU kurulumunu doğrula':'Donanıma uygun GPU motorunu kur';$('ai-compute').querySelector('[value="gpu"]').disabled=!state.gpu;$('ai-quality').querySelector('[value="fidelity"]').disabled=!state.qualityReady;$('ai-install-quality').hidden=!!state.qualityReady;$('ai-device').textContent=(state.job?.state==='running'&&state.job?.device?'Çalışan aygıt: '+state.job.device:state.gpu?'Otomatik seçim ekran kartını kullanır.':'Otomatik seçim işlemciyi kullanır.')+(state.job?.fallback?' GPU işlemi başarısız oldu; işlemciye dönüldü.':'');if(state.hardware){const h=state.hardware;$('ai-hardware').textContent='Üretim bilgisayarı: '+h.cpu+' · '+h.ramGB+' GB RAM ('+h.freeGB+' GB boş) · '+(state.busy&&state.job?.threads||h.threads)+' iş parçacığı · '+({low:'Bellek tasarrufu',balanced:'Dengeli',high:'Yüksek bellek'}[h.memoryMode]||h.memoryMode)+(state.gpu?.memoryGB?' · '+state.gpu.memoryGB+' GB GPU':'');}updateButtons(state.busy||pending,state.ready);
+   const job=allowResults||state.job?.kind?.startsWith('install')?state.job:null;lastServerReference=state.reference?.id;
    if(job?.id!==reportedJobId){reportedJobId=job?.id;localError=null;}
    if(job&&!localError){
     $('ai-state').classList.toggle('ai-state-error',job.state==='failed');$('ai-state').textContent=job.message;
@@ -42,7 +42,7 @@ export function initLocalAI({onEdit,onModelReady}){
     if(job.progress!==undefined&&(job.kind.startsWith('install')||['concept','sample'].includes(job.phase)))$('ai-progress').value=job.progress;else $('ai-progress').removeAttribute('value');$('ai-progress').hidden=!state.busy;
     if(job.translated)$('ai-translated').textContent='Yerel çeviri: '+job.translated;
    }
-   if(state.reference&&referenceId!==state.reference.id){
+   if(allowResults&&state.reference&&state.reference.id!==ignoredReference&&referenceId!==state.reference.id){
     const value=await bridge('concept-result',{id:state.reference.id});reference=value;referenceId=value.id;
     if(part){part=null;loadedId=null;resultId=null;queued=null;frameReady=false;frame.src='mesh-editor.html?preview=1';view(false);$('ai-result').textContent='Henüz 3D model üretilmedi.';}
     $('ai-concept-image').src=value.image;$('ai-concept-image').hidden=false;$('ai-concept-empty').hidden=true;$('ai-concept-note').hidden=false;
@@ -62,8 +62,8 @@ export function initLocalAI({onEdit,onModelReady}){
   }catch(e){error(e);}finally{if(active||pending)timer=setTimeout(poll,1500);}
  }
  async function run(action,data){
-  if(pending)return;pending=true;localError=null;updateButtons(true,false);$('ai-state').classList.remove('ai-state-error');$('ai-state').textContent='İşlem başlatılıyor…';
-  try{await bridge(action,data);if(action==='concept'||action==='import-image'){part=null;loadedId=null;resultId=null;queued=null;frameReady=false;frame.src='mesh-editor.html?preview=1';view(false);$('ai-result').textContent='Henüz 3D model üretilmedi.';}}
+  if(pending)return;if(action==='concept'||action==='import-image'){allowResults=true;ignoredReference=lastServerReference;reference=null;referenceId=null;}pending=true;localError=null;updateButtons(true,false);$('ai-state').classList.remove('ai-state-error');$('ai-state').textContent='İşlem başlatılıyor…';
+  try{const result=await bridge(action,data);if(action==='concept'||action==='import-image'){part=null;loadedId=null;resultId=null;queued=null;frameReady=false;frame.src='mesh-editor.html?preview=1';view(false);$('ai-result').textContent='Henüz 3D model üretilmedi.';}}
   catch(e){pending=false;updateButtons(false,lastReady);error(e);return;}finally{pending=false;}
   await poll();
  }

@@ -41,7 +41,7 @@ def concept(home,job,output):
     from PIL import Image as PILImage
     model=home/'models-v2'/'image'
     identity=[IMAGE,*[file_identity(model/folder/name) for folder,name in [('unet','diffusion_pytorch_model.fp16.safetensors'),('vae','diffusion_pytorch_model.fp16.safetensors'),('text_encoder','model.fp16.safetensors')]]]
-    concept_key=key_for('concept',identity,job['prompt'],job.get('language','tr'),job['seed'],job.get('backend','cpu'),job.get('precision','auto'),job.get('runtime',{}))
+    concept_key=key_for('concept-detail-v2',identity,job['prompt'],job.get('language','tr'),job['seed'],job.get('backend','cpu'),job.get('precision','auto'),job.get('runtime',{}))
     cache=ProductionCache(home,job.get('resources',{}).get('memoryMode','balanced'))
     cached=cache.load(concept_key)
     if cached is not None:
@@ -61,7 +61,7 @@ def concept(home,job,output):
     init_compute(job)
     prompt=translate(home,job)
     # Presentation only; no object names or predefined shapes are added.
-    image_prompt=f'{prompt}, single complete object, full body, isolated on a plain white background, 3D sculpture, studio product photograph'
+    image_prompt=f'{prompt}, single complete object, full body, isolated on a plain white background, sharp focus, intricate details, clearly defined edges, studio product photograph'
     report('Tariften kontrol görseli üretiliyor…',phase='concept',translated=prompt)
     pipe=StableDiffusionPipeline.from_pretrained(str(home / 'models-v2' / 'image'),variant='fp16',torch_dtype=dtype_for(job['_device'],job.get('precision','auto')),local_files_only=True)
     device=job.get('_device',torch.device('cpu'))
@@ -135,7 +135,7 @@ def mesh(home,job,output):
     identity=[SOURCE,SHAPE,file_identity(folder/'model.fp16.safetensors'),file_identity(folder/'config.yaml')]
     image_key=key_for(hashlib.sha256((reference/'reference.png').read_bytes()).hexdigest(),identity,job.get('backend','cpu'),job.get('precision','auto'),job.get('runtime',{}))
     latent_key=key_for('latent',image_key,job['seed'],30 if fidelity else 5)
-    resolution=256 if fidelity or job.get('steps')!=32 else 192
+    resolution=384 if job.get('steps')==128 else 256 if fidelity or job.get('steps')!=32 else 192
     surface_key=key_for('surface',latent_key,resolution,file_identity(vae_folder/'model.fp16.safetensors'))
     cache=ProductionCache(home,job.get('resources',{}).get('memoryMode','balanced'))
     surface=cache.load(surface_key)

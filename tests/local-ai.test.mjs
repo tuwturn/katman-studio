@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {createWebServer} from '../server.mjs';
 const require=createRequire(import.meta.url),{validatePrompt,validateImage,LocalAI}=require('../desktop/local-ai.cjs');
+test('startup ignores saved examples without deleting user output files',async()=>{
+ const {mkdtemp,writeFile,readFile,rm}=await import('node:fs/promises'),{tmpdir}=await import('node:os'),path=await import('node:path');const folder=await mkdtemp(path.join(tmpdir(),'katman-empty-'));
+ try{for(const[kind,file]of [['concept','last-concept-v2.json'],['generate','last-model-v2.json']])await writeFile(path.join(folder,file),JSON.stringify({id:'12345678-abcd-1234-abcd-123456789012',kind,state:'succeeded',prompt:'Old example'}));const engine=new LocalAI({home:folder,scripts:process.cwd()+'/local-ai'});assert.equal(engine.status().job,null);assert.equal(engine.status().reference,null);assert.match(await readFile(path.join(folder,'last-model-v2.json'),'utf8'),/Old example/);assert.equal(validatePrompt({prompt:'Detailed object',quality:'detail'}).steps,128);}finally{await rm(folder,{recursive:true,force:true});}
+});
 test('height changes retain the reference variation and fidelity requires a separate installed model',async()=>{
  const engine=new LocalAI({home:process.cwd()+'/test-results/not-installed-ai',scripts:process.cwd()+'/local-ai'});engine.ready=()=>true;engine.gpu=()=>null;engine.reference={id:'12345678-abcd-1234-abcd-123456789012',prompt:'Approved teapot',seed:42,language:'en'};
  let input;engine.launch=(_kind,_python,_args,value)=>input=value;
