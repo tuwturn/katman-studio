@@ -3,6 +3,18 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {createWebServer} from '../server.mjs';
 const require=createRequire(import.meta.url),{validatePrompt,validateImage,LocalAI}=require('../desktop/local-ai.cjs');
+test('realistic install uses a separate completion marker and requires both text encoders',async()=>{
+ const {mkdtemp,mkdir,writeFile,unlink,rm}=await import('node:fs/promises'),{tmpdir}=await import('node:os'),path=await import('node:path');const folder=await mkdtemp(path.join(tmpdir(),'katman-realistic-'));
+ try{
+  const engine=new LocalAI({home:folder,scripts:process.cwd()+'/local-ai'});engine.ready=()=>true;
+  let call;engine.launch=(kind,python,args)=>call={kind,python,args};await engine.request('install-realistic');assert.equal(call.kind,'install-realistic');assert(call.args.includes('--realistic-models'));
+  await writeFile(path.join(folder,'ready-image-xl.json'),'{}');assert.equal(engine.status().realisticReady,false);
+  const names=['scheduler/scheduler_config.json','unet/config.json','vae/config.json','text_encoder/config.json','text_encoder_2/config.json','tokenizer/merges.txt','tokenizer/vocab.json','tokenizer_2/merges.txt','tokenizer_2/vocab.json','model_index.json','text_encoder/model.fp16.safetensors','text_encoder_2/model.fp16.safetensors','unet/diffusion_pytorch_model.fp16.safetensors','vae/diffusion_pytorch_model.fp16.safetensors'];
+  for(const name of names){const file=path.join(folder,'models-v2/image-realistic',name);await mkdir(path.dirname(file),{recursive:true});await writeFile(file,'fixture');}
+  assert.equal(engine.status().realisticReady,false);await writeFile(path.join(folder,'ready-image-realistic.json'),'{}');assert.equal(engine.status().realisticReady,false);const vaeRoot=path.join(folder,'models-v2/image-realistic-vae');await mkdir(vaeRoot,{recursive:true});await writeFile(path.join(vaeRoot,'config.json'),'{}');await writeFile(path.join(vaeRoot,'diffusion_pytorch_model.safetensors'),'fixture');assert.equal(engine.status().realisticReady,true);
+  await unlink(path.join(folder,'models-v2/image-realistic/text_encoder_2/model.fp16.safetensors'));assert.equal(engine.status().realisticReady,false);
+ }finally{await rm(folder,{recursive:true,force:true});}
+});
 test('startup ignores saved examples without deleting user output files',async()=>{
  const {mkdtemp,writeFile,readFile,rm}=await import('node:fs/promises'),{tmpdir}=await import('node:os'),path=await import('node:path');const folder=await mkdtemp(path.join(tmpdir(),'katman-empty-'));
  try{for(const[kind,file]of [['concept','last-concept-v2.json'],['generate','last-model-v2.json']])await writeFile(path.join(folder,file),JSON.stringify({id:'12345678-abcd-1234-abcd-123456789012',kind,state:'succeeded',prompt:'Old example'}));const engine=new LocalAI({home:folder,scripts:process.cwd()+'/local-ai'});assert.equal(engine.status().job,null);assert.equal(engine.status().reference,null);assert.match(await readFile(path.join(folder,'last-model-v2.json'),'utf8'),/Old example/);assert.equal(validatePrompt({prompt:'Detailed object',quality:'detail'}).steps,128);}finally{await rm(folder,{recursive:true,force:true});}

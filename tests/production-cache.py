@@ -7,10 +7,38 @@ sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[1]/'local-ai'))
 from production_cache import ProductionCache,key_for
 from reference_image import prepare_reference,FaithfulImageProcessor
 from gpu_runtime import dtype_for
-from generate_v2 import import_image,build_image_prompt,concept,normalize_translated_subject
+from generate_v2 import import_image,build_image_prompt,concept,normalize_translated_subject,image_parameters,decode_realistic_latents,cpu_vae_required
 import torch
 
 class ProductionTests(unittest.TestCase):
+    def test_fp32_vae_decodes_the_same_latent_with_bounded_tiles_and_no_invalid_pixels(self):
+        class Decoder(torch.nn.Module):
+            def __init__(self):
+                super().__init__();self.weight=torch.nn.Parameter(torch.zeros(1,dtype=torch.float16));self.config=types.SimpleNamespace(scaling_factor=.5)
+            def enable_tiling(self):self.tiled=True
+            def decode(self,latent,return_dict):
+                self.input=latent;return (torch.cat([latent[:,:1]]*3,dim=1),)
+        vae=Decoder();pixels=decode_realistic_latents(vae,torch.full((1,4,2,2),.25,dtype=torch.float16),torch.device('cpu'))
+        self.assertEqual(vae.weight.dtype,torch.float32);self.assertEqual(vae.input.dtype,torch.float32)
+        self.assertEqual((vae.tile_sample_min_size,vae.tile_latent_min_size),(512,64));self.assertTrue(vae.tiled)
+        np.testing.assert_allclose(pixels,.75)
+        with self.assertRaisesRegex(RuntimeError,'sayısal taşma'):decode_realistic_latents(vae,torch.full((1,4,2,2),float('nan')),torch.device('cpu'))
+        self.assertTrue(cpu_vae_required('rocm','win32','gfx1031'))
+        self.assertFalse(cpu_vae_required(None,'win32',''))
+        self.assertFalse(cpu_vae_required('rocm','win32','gfx1100'))
+        self.assertFalse(cpu_vae_required('rocm','linux','gfx1031'))
+    def test_realism_uses_a_different_checkpoint_resolution_and_guided_sampling(self):
+        real=image_parameters('realistic');fast=image_parameters('xl')
+        self.assertNotEqual(real['revision'],fast['revision'])
+        self.assertEqual((real['size'],real['steps'],real['guidance']),(1024,30,5.0))
+        self.assertEqual((fast['size'],fast['steps'],fast['guidance']),(512,4,0.0))
+        self.assertIn('realistic photograph',build_image_prompt('a child','realistic'))
+        self.assertIn('a wooden chair',build_image_prompt('a wooden chair','realistic'))
+        self.assertIn('head and feet visible',build_image_prompt('a person','realistic',person=True))
+        self.assertNotIn('full-length',build_image_prompt('a portrait bust of a person','realistic'))
+        self.assertNotIn('photograph',build_image_prompt('a monochrome pencil sketch','realistic'))
+        self.assertTrue(real['negative']);self.assertIsNone(fast['negative'])
+        with self.assertRaises(ValueError):image_parameters('unknown')
     def test_single_word_person_is_disambiguated_without_replacing_explicit_anatomy(self):
         self.assertEqual(normalize_translated_subject('human'),'a person')
         self.assertEqual(normalize_translated_subject('human skeleton'),'human skeleton')

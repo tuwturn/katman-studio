@@ -6,6 +6,8 @@ SOURCE = 'f8db63096c8282cb27354314d896feba5ba6ff8a'
 SHAPE = 'f90a0f7df7d5e6f71109cf333f6a95a0ae3194a6'
 IMAGE = 'b261bac6fd2cf515557d5d0707481eafa0485ec2'
 IMAGE_XL = '71153311d3dbb46851df1931d3ca6e939de83304'
+IMAGE_REALISTIC = '26dfe44930964cd70d0a817b6d1cc945c130e38d'
+VAE_XL_FP16 = '207b116dae70ace3637169f1ddd2434b91b3a8cd'
 
 def file_hash(path):
     digest=hashlib.sha256()
@@ -126,9 +128,9 @@ def repo_download(repo,revision,root,patterns,reuse=False):
                 except Exception:
                     if attempt==3:raise
                     time.sleep(2)
-        with ThreadPoolExecutor(max_workers=6) as chunks:
+        with ThreadPoolExecutor(max_workers=16) as chunks:
             while offset<size:
-                ranges=[(start,min(start+16*1024*1024,size)-1) for start in range(offset,min(offset+96*1024*1024,size),16*1024*1024)]
+                ranges=[(start,min(start+4*1024*1024,size)-1) for start in range(offset,min(offset+96*1024*1024,size),4*1024*1024)]
                 futures=[chunks.submit(segment,start,end) for start,end in ranges]
                 for future in futures:
                     block=future.result()
@@ -200,11 +202,26 @@ def image_xl_models(home):
     marker.write_text(json.dumps({'engine':'sdxl-turbo','revision':IMAGE_XL}),encoding='utf-8');marker.replace(home/'ready-image-xl.json')
     report('SDXL-Turbo görsel motoru hazır.',ready=True)
 
+def realistic_models(home):
+    report('RealVisXL gerçekçi görsel motoru indiriliyor · yaklaşık 7 GB…')
+    repo_download('SG161222/RealVisXL_V4.0',IMAGE_REALISTIC,home/'models-v2'/'image-realistic',[
+        'model_index.json','scheduler/*.json','tokenizer/*','tokenizer_2/*',
+        'text_encoder/config.json','text_encoder/model.fp16.safetensors',
+        'text_encoder_2/config.json','text_encoder_2/model.fp16.safetensors',
+        'unet/config.json','unet/diffusion_pytorch_model.fp16.safetensors',
+        'vae/config.json','vae/diffusion_pytorch_model.fp16.safetensors','LICENSE*','README.md'])
+    repo_download('madebyollin/sdxl-vae-fp16-fix',VAE_XL_FP16,home/'models-v2'/'image-realistic-vae',[
+        'config.json','diffusion_pytorch_model.safetensors','README.md','LICENSE*'])
+    marker=home/'ready-image-realistic.json.tmp'
+    marker.write_text(json.dumps({'engine':'realvisxl-v4','revision':IMAGE_REALISTIC,'vaeRevision':VAE_XL_FP16}),encoding='utf-8');marker.replace(home/'ready-image-realistic.json')
+    report('RealVisXL gerçekçi görsel motoru hazır.',ready=True)
+
 if __name__=='__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('--home',required=True);parser.add_argument('--models',action='store_true');parser.add_argument('--quality-models',action='store_true');parser.add_argument('--image-xl-models',action='store_true');args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--home',required=True);parser.add_argument('--models',action='store_true');parser.add_argument('--quality-models',action='store_true');parser.add_argument('--image-xl-models',action='store_true');parser.add_argument('--realistic-models',action='store_true');args=parser.parse_args()
     try:
         home=pathlib.Path(args.home).resolve()
-        if args.image_xl_models:image_xl_models(home)
+        if args.realistic_models:realistic_models(home)
+        elif args.image_xl_models:image_xl_models(home)
         elif args.quality_models:quality_models(home)
         elif args.models:models(home)
         else:install(home)

@@ -3,6 +3,19 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {previewProfile} from '../src/performance-profile.js';
 const require=createRequire(import.meta.url),{policy,backendFor,imageEngineFor,precisionRetry}=require('../desktop/hardware.cjs');
+test('realistic quality is preferred only when installed and capacity permits; explicit choice cannot silently downgrade',()=>{
+ const resources={ramGB:16,freeGB:6},gpu={memoryGB:12};
+ assert.equal(imageEngineFor({installed:true,realisticInstalled:true,gpu,resources}),'realistic');
+ assert.equal(imageEngineFor({installed:true,realisticInstalled:false,gpu,resources}),'xl');
+ assert.equal(imageEngineFor({installed:true,realisticInstalled:true,gpu,resources:{...resources,freeGB:3}}),'xl');
+ assert.throws(()=>imageEngineFor({requested:'realistic',realisticInstalled:true,gpu,resources:{...resources,freeGB:3}}),/4 GB boş RAM/);
+ assert.equal(imageEngineFor({installed:true,realisticInstalled:true,gpu,resources:{ramGB:8,freeGB:5}}),'turbo');
+ assert.equal(imageEngineFor({requested:'xl',installed:true,realisticInstalled:true,gpu,resources}),'xl');
+ assert.throws(()=>imageEngineFor({requested:'realistic',installed:true,gpu,resources}),/RealVisXL/);
+ assert.equal(imageEngineFor({requested:'realistic',realisticInstalled:true,gpu,resources}),'realistic');
+ assert.equal(precisionRetry({imageEngine:'realistic',imageMode:'realistic'},{ramGB:16}).imageEngine,'realistic');
+ assert.equal(precisionRetry({imageEngine:'realistic',imageMode:'auto'},{ramGB:16}).imageEngine,'turbo');
+});
 test('precision retry respects explicit XL choice and retains reference and variation',()=>{
  const input={imageEngine:'xl',imageMode:'auto',seed:42,referenceId:'same-reference',precision:'auto'};
  const low=precisionRetry(input,{ramGB:16});assert.equal(low.imageEngine,'turbo');assert.equal(low.precision,'float32');assert.equal(low.seed,42);assert.equal(low.referenceId,input.referenceId);

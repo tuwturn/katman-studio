@@ -20,19 +20,21 @@ async function readAdapters(platform){
  if(!['win32','linux'].includes(platform))return[];
  try{const output=await new Promise((resolve,reject)=>execFile(command,args,{windowsHide:true,timeout:10000,encoding:'utf8'},(e,out)=>e?reject(e):resolve(out)));return platform==='win32'?[JSON.parse(output)].flat().filter(a=>a?.name):output.trim().split('\n').filter(Boolean).map(name=>({name:name.trim()}));}catch{return[];}
 }
-function imageEngineFor({requested='auto',installed=false,gpu=null,resources=policy(),precision='auto'}={}){
- if(!['auto','turbo','xl'].includes(requested))throw new Error('Geçersiz görsel motoru.');
+function imageEngineFor({requested='auto',installed=false,realisticInstalled=false,gpu=null,resources=policy(),precision='auto'}={}){
+ if(!['auto','turbo','xl','realistic'].includes(requested))throw new Error('Geçersiz görsel motoru.');
  const gpuFits=gpu&&resources.ramGB>=15&&resources.freeGB>=2&&(gpu.memoryGB??8)>=4&&precision!=='float32';
  const cpuFits=resources.ramGB>=23.5&&resources.freeGB>=16;
+ const realisticFits=cpuFits||(gpuFits&&resources.freeGB>=4);
  if(requested==='turbo')return'turbo';
- if(requested==='auto')return installed&&((gpuFits&&(gpu.memoryGB??8)>=8)||cpuFits)?'xl':'turbo';
- if(!installed)throw new Error('Önce SDXL görsel motorunu kurun.');
+ if(requested==='auto')return ((gpuFits&&(gpu.memoryGB??8)>=8)||cpuFits)?(realisticInstalled&&realisticFits?'realistic':installed?'xl':'turbo'):'turbo';
+ if(requested==='realistic'?!realisticInstalled:!installed)throw new Error('Önce '+(requested==='realistic'?'RealVisXL':'SDXL')+' görsel motorunu kurun.');
+ if(requested==='realistic'&&!realisticFits)throw new Error('RealVisXL için GPU ile en az 16 GB RAM ve 4 GB boş RAM; işlemci veya tam hassasiyette en az 24 GB RAM ve 16 GB boş bellek gerekli. Diğer programları kapatabilir veya hafif motoru seçebilirsiniz.');
  if(!gpuFits&&!cpuFits)throw new Error('SDXL için GPU ile en az 16 GB RAM / 4 GB VRAM; işlemci veya tam hassasiyette en az 24 GB RAM ve 16 GB boş bellek gerekli. Hafif motoru seçebilirsiniz.');
- return'xl';
+ return requested;
 }
 function precisionRetry(input,resources=policy()){
  const retry={...input,precision:'float32',precisionFallback:true};
- if(input.imageEngine==='xl'&&input.imageMode==='auto'&&resources.ramGB<23.5){retry.imageEngine='turbo';retry.imageFallback=true;}
+ if(['xl','realistic'].includes(input.imageEngine)&&input.imageMode==='auto'&&resources.ramGB<23.5){retry.imageEngine='turbo';retry.imageFallback=true;}
  return retry;
 }
 module.exports={policy,backendFor,detectAdapters,imageEngineFor,precisionRetry};
