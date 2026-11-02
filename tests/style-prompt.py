@@ -28,7 +28,7 @@ class StyleTests(unittest.TestCase):
         self.assertNotIn('photograph',styled_prompt('a watercolor painting of a landscape','auto'))
     def test_framing_keeps_seated_pose_and_explicit_close_up(self):
         self.assertEqual(figure_size('a person sitting',True),(1024,1024))
-        self.assertEqual(figure_size('a standing person',True),(768,1344))
+        self.assertEqual(figure_size('a standing person',True),(1024,1536))
         self.assertEqual(figure_size('a portrait bust',True),(1024,1024))
         self.assertNotIn('head and feet',styled_prompt('a portrait bust','clay',True))
         self.assertNotIn('cropped',negative_prompt('a portrait bust','clay',True))

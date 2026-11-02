@@ -25,6 +25,7 @@ def subject_caption(prompt,single):
 def styled_prompt(prompt,style='auto',person=False,single=True):
     if style not in STYLES:raise ValueError('Geçersiz çizim tarzı.')
     subject=subject_caption(prompt,single)
+    person=person or bool(re.search(r'\b(?:person|people|human|man|men|woman|women|boy|boys|girl|girls|child|children|farmer|villager|worker|soldier|dancer|athlete|chef|rider)\b',subject,re.I))
     mono=bool(re.search(r'\b(monochrome|grayscale|sepia|black and white)\b',prompt,re.I))
     kinds={
         'auto':'image','realistic':'realistic photograph' if mono else 'realistic color photograph',
@@ -37,7 +38,9 @@ def styled_prompt(prompt,style='auto',person=False,single=True):
     result=('An ' if not framing and kind[0].lower() in 'aeiou' else 'A ')+framing+kind+' of '+subject
     if not close:result+=', head and feet visible, entire figure in frame' if person else ', entire subject in frame'
     if single:result+=', solo' if person else ', single main subject'
-    if style=='caricature':result+=', vibrant full-color palette, expressive exaggerated features, clean bold outlines'
+    if person and not close:
+        result+=', clear recognizable face, well-defined eyes, carefully rendered facial features, clearly separated fingers and well-formed hands'
+    if style=='caricature':result+=', vibrant full-color palette, expressive exaggerated facial features, clearly drawn eyes and fingers, clean bold outlines'
     if style in {'cartoon','illustration','anime'} and not mono:result+=', vibrant full-color palette, clear contrasting colors'
     if style=='realistic':result+=', natural proportions, soft lighting'
     return result+', plain white background'
@@ -55,4 +58,4 @@ def negative_prompt(prompt,style='auto',person=False,single=True):
 
 def figure_size(prompt,person):
     seated=bool(re.search(r'\b(sitting|seated|kneeling|crouching|lying)\b',prompt,re.I))
-    return (768,1344) if person and not seated and not close_view_requested(prompt) else (1024,1024)
+    return (1024,1536) if person and not seated and not close_view_requested(prompt) else (1024,1024)

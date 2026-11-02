@@ -59,7 +59,7 @@ Düzenleyici yerel yüzey işlemleri uygular; yazıları kendiliğinden tanımaz
 
 ## Yerel yapay zekâ ile yazıdan veya görselden 3D
 
-Bir tarif yazın veya görsel yükleyerek 2D kontrol görseli hazırlayın. Görsel tarzını seçin, sonucu inceleyin ve 3D üretimine geçmeden önce onaylayın. Yerel modeller genel amaçlı görsel ve şekil üreticileridir; aynı tarif farklı sonuçlar verebilir. Seçilen tarz veya konu sayısı birebir sonuç garantisi vermez. Gerekirse yeni varyasyon üretin veya tarifi düzenleyin.
+Bir tarif yazın veya görsel yükleyerek 2D kontrol görseli hazırlayın. İnsan figürlerinde yüz ve el ayrıntıları için portre boyutu artırılmıştır; 2D sonuç seçilen görsel motoruna, tarife ve stile bağlıdır. Sonucu inceleyip 3D üretimine geçmeden önce onaylayın. İsteğe bağlı Hunyuan3D 2.0 modeli, 50 üretim adımı ve 512 yüzey çözünürlüğüyle Mini motordan daha ince geometri üretir; yaklaşık 5,4 GB indirme gerektirir ve desteklenen ekran kartında en az 6 GB VRAM, işlemciyle kullanımda en az 24 GB RAM ister. Daha yüksek çözünürlük üretimi yavaşlatır ve tek bir görünüşte bulunmayan yüzey ayrıntılarını geri getiremez. Yerel modeller genel amaçlı üreticilerdir; sonuç tarife ve stile göre değişebilir. Gerekirse kontrol görselini değiştirin veya yeni varyasyon üretin.
 
 ## Kaynak koddan geliştirme
 

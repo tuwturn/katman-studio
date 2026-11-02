@@ -4,6 +4,11 @@ function policy({total=os.totalmem(),free=os.freemem(),cores=os.availableParalle
  const gib=1024**3,low=total<12*gib||free<4*gib,high=total>=32*gib&&free>=12*gib;
  return{ramGB:Math.round(total/gib*10)/10,freeGB:Math.round(free/gib*10)/10,cores,threads:Math.max(1,Math.min(low?2:high?12:6,Math.floor(cores/2))),memoryMode:low?'low':high?'high':'balanced',attentionMB:low?16:high?128:64,decodeChunks:low?512:high?4096:2048};
 }
+function highQuality3DFits({gpu=null,resources=policy()}={}){
+ const gpuFits=gpu&&(gpu.memoryGB??0)>=6&&resources.ramGB>=15&&resources.freeGB>=4;
+ const cpuFits=resources.ramGB>=23.5&&resources.freeGB>=16;
+ return !!(gpuFits||cpuFits);
+}
 function backendFor(adapters,platform=process.platform){
  if(!['win32','linux'].includes(platform))return null;
  if(adapters.some(a=>/nvidia/i.test(a.name)))return'cuda';
@@ -40,4 +45,4 @@ function precisionRetry(input,resources=policy()){
  if(['xl','realistic','base'].includes(input.imageEngine)&&input.imageMode==='auto'&&resources.ramGB<23.5){retry.imageEngine='turbo';retry.imageFallback=true;}
  return retry;
 }
-module.exports={policy,backendFor,detectAdapters,imageEngineFor,precisionRetry};
+module.exports={policy,highQuality3DFits,backendFor,detectAdapters,imageEngineFor,precisionRetry};

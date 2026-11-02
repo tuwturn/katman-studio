@@ -196,6 +196,17 @@ def quality_models(home):
         'hunyuan3d-vae-v2-mini/config.yaml','hunyuan3d-vae-v2-mini/model.fp16.safetensors'],reuse=True)
     report('Mini kalite motoru hazır. API olmadan yerel çalışır.',ready=True)
 
+def high_quality_models(home):
+    report('Yüksek kalite Hunyuan3D 2.0 modeli indiriliyor · yaklaşık 5,4 GB…')
+    root=home/'models-v2'/'shape'
+    repo_download('tencent/Hunyuan3D-2',SHAPE,root,[
+        'hunyuan3d-dit-v2-0/config.yaml','hunyuan3d-dit-v2-0/model.fp16.safetensors',
+        'hunyuan3d-vae-v2-0/config.yaml','hunyuan3d-vae-v2-0/model.fp16.safetensors',
+        'LICENSE*','NOTICE*','README.md'])
+    marker=home/'ready-hunyuan-high.json.tmp'
+    marker.write_text(json.dumps({'engine':'hunyuan3d-2.0','revision':SHAPE}),encoding='utf-8');marker.replace(home/'ready-hunyuan-high.json')
+    report('Hunyuan3D yüksek kalite modeli hazır.',ready=True)
+
 def image_xl_models(home):
     report('SDXL-Turbo görsel motoru indiriliyor · yaklaşık 7 GB…')
     repo_download('stabilityai/sdxl-turbo',IMAGE_XL,home/'models-v2'/'image-xl',[
@@ -237,10 +248,11 @@ def realistic_models(home):
     report('RealVisXL gerçekçi görsel motoru hazır.',ready=True)
 
 if __name__=='__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('--home',required=True);parser.add_argument('--models',action='store_true');parser.add_argument('--quality-models',action='store_true');parser.add_argument('--image-xl-models',action='store_true');parser.add_argument('--realistic-models',action='store_true');parser.add_argument('--base-image-models',action='store_true');args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--home',required=True);parser.add_argument('--models',action='store_true');parser.add_argument('--quality-models',action='store_true');parser.add_argument('--high-quality-models',action='store_true');parser.add_argument('--image-xl-models',action='store_true');parser.add_argument('--realistic-models',action='store_true');parser.add_argument('--base-image-models',action='store_true');args=parser.parse_args()
     try:
         home=pathlib.Path(args.home).resolve()
-        if args.base_image_models:base_image_models(home)
+        if args.high_quality_models:high_quality_models(home)
+        elif args.base_image_models:base_image_models(home)
         elif args.realistic_models:realistic_models(home)
         elif args.image_xl_models:image_xl_models(home)
         elif args.quality_models:quality_models(home)

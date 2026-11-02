@@ -223,14 +223,18 @@ def mesh(home,job,output):
     from PIL import Image
     reference=home/'jobs'/job['referenceId'];metadata=json.loads((reference/'concept.json').read_text(encoding='utf-8'))
     image=Image.open(reference/'reference.png').convert('RGBA')
-    fidelity=job.get('quality')=='fidelity';suffix='' if fidelity else '-turbo'
-    folder=home/'models-v2'/'shape'/('hunyuan3d-dit-v2-mini'+suffix)
-    vae_folder=folder.parent/('hunyuan3d-vae-v2-mini'+suffix)
+    high_quality=job.get('quality')=='high';fidelity=job.get('quality')=='fidelity';suffix='' if fidelity else '-turbo'
+    model_name='hunyuan3d-dit-v2-0' if high_quality else 'hunyuan3d-dit-v2-mini'+suffix
+    vae_name='hunyuan3d-vae-v2-0' if high_quality else 'hunyuan3d-vae-v2-mini'+suffix
+    folder=home/'models-v2'/'shape'/model_name
+    vae_folder=folder.parent/vae_name
+    if high_quality and (not (folder/'model.fp16.safetensors').exists() or not (vae_folder/'model.fp16.safetensors').exists()):raise RuntimeError('Önce Hunyuan3D yüksek kalite modelini kurun.')
     if not (folder/'model.fp16.safetensors').exists():raise RuntimeError('Önce alternatif Mini motorunu kurun.')
     identity=[SOURCE,SHAPE,file_identity(folder/'model.fp16.safetensors'),file_identity(folder/'config.yaml')]
     image_key=key_for(hashlib.sha256((reference/'reference.png').read_bytes()).hexdigest(),identity,job.get('backend','cpu'),job.get('precision','auto'),job.get('runtime',{}))
-    latent_key=key_for('latent',image_key,job['seed'],30 if fidelity else 5)
-    resolution=384 if job.get('steps')==128 else 256 if fidelity or job.get('steps')!=32 else 192
+    latent_steps=50 if high_quality else 30 if fidelity else 5
+    latent_key=key_for('latent',image_key,job['seed'],latent_steps)
+    resolution=512 if high_quality else 384 if job.get('steps')==128 else 256 if fidelity or job.get('steps')!=32 else 192
     surface_key=key_for('surface',latent_key,resolution,file_identity(vae_folder/'model.fp16.safetensors'))
     cache=ProductionCache(home,job.get('resources',{}).get('memoryMode','balanced'))
     surface=cache.load(surface_key)
@@ -282,7 +286,7 @@ def mesh(home,job,output):
             latent_shape=(config['vae']['params']['num_latents'],config['vae']['params']['embed_dim'])
         model=component('model');parameter=next(model.parameters());model_device=parameter.device;embedding=embedding.to(device=model_device,dtype=parameter.dtype)
         pipeline=Hunyuan3DDiTFlowMatchingPipeline(vae=LatentShape(),model=model,scheduler=instantiate_from_config(config['scheduler']),conditioner=CachedConditioner(embedding),image_processor=processor,device=model_device,dtype=parameter.dtype)
-        steps=30 if fidelity else 5
+        steps=latent_steps
         def progress(step,*args):report(f'Görselden 3D biçim üretiliyor · {step+1}/{steps}',phase='sample',progress=(step+1)*100/steps)
         with torch.inference_mode():latents=pipeline(image=image,num_inference_steps=steps,guidance_scale=5.0,output_type='latent',generator=torch.Generator('cpu').manual_seed(job['seed']),callback=progress,callback_steps=1,enable_pbar=False)
         if not torch.isfinite(latents).all():raise RuntimeError('3D üretiminde sayısal taşma oluştu.')
@@ -333,7 +337,7 @@ def finish_mesh(vertices,faces,metadata,job,output):
     cleaned=clean_mesh(vertices,faces)
     vertices=np.asarray(cleaned.vertices);faces=np.asarray(cleaned.faces)
     # Shape generation is monochrome. Do not invent colors by projecting the front image onto the back.
-    result={'engine':'hunyuan3d-mini','color_space':'linear','name':metadata['prompt'][:80],'vertices':vertices.round(6).tolist(),'triangles':faces.tolist(),'colors':np.tile([.58,.65,.75],(len(vertices),1)).tolist()}
+    result={'engine':'hunyuan3d-2.0' if job.get('quality')=='high' else 'hunyuan3d-mini','color_space':'linear','name':metadata['prompt'][:80],'vertices':vertices.round(6).tolist(),'triangles':faces.tolist(),'colors':np.tile([.58,.65,.75],(len(vertices),1)).tolist()}
     temporary=output / 'mesh.tmp';temporary.write_text(json.dumps(result,separators=(',',':')),encoding='utf-8');temporary.replace(output / 'mesh.json')
     (output / 'prompt.json').write_text(json.dumps({**metadata,'referenceId':job['referenceId'],'height':job['height']},ensure_ascii=False),encoding='utf-8')
     report('3D model hazır. Görsel uyumunu önizlemede kontrol edin.',phase='done',vertices=len(vertices),triangles=len(faces))
