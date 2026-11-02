@@ -1,35 +1,35 @@
 # Katman Studio
 
-Katman Studio is a desktop application for converting raster artwork into editable vector regions and 3D reliefs, editing existing 3D models, and creating 3D concepts from text or images with local AI models.
+Katman Studio; görselleri düzenlenebilir vektör bölgelerine ve 3D kabartmalara dönüştüren, 3D modelleri düzenleyen ve yerel yapay zekâ modelleriyle yazıdan ya da görselden 3D taslak oluşturan bir masaüstü uygulamasıdır.
 
-## Features
+## Özellikler
 
-- **Image to vector and relief:** Import common image formats, trace smooth vector boundaries, select individual regions or nearby colors, assign relief heights, preview the result, and export 3MF, STL, OBJ, or SVG.
-- **3D model editing:** Open STL, 3MF, and OBJ files. Select surface areas with points, remove raised sections, flatten or fill areas, undo edits, and export the result.
-- **Text or image to 3D:** Generate a local 2D concept from a text description or an imported image, review it, then create and preview a 3D model. Choose a visual style and whether the description should focus on one subject. Export 3MF, STL, or OBJ.
-- **Local processing:** Installed AI models run on the selected computer without a generation API key. Model downloads are optional and take place during setup.
-- **Local network access:** Run the bundled web server to use the vector and editing workspaces from browsers on the same network. Local AI generation runs on the computer hosting the server.
-- **macOS:** Download the matching Apple Silicon or Intel package from GitHub Releases.
+- **Görselden vektör ve kabartma:** Yaygın görsel biçimlerini açın, düzgün vektör sınırları oluşturun, tek tek bölgeleri veya benzer renkleri seçin, yükseklik verin, önizleyin ve 3MF, STL, OBJ ya da SVG olarak dışa aktarın.
+- **3D model düzenleme:** STL, 3MF ve OBJ dosyalarını açın. Noktalarla yüzey alanı seçin; çıkıntılı kısımları kaldırın, alanları düzleyin veya doldurun, işlemleri geri alın ve modeli dışa aktarın.
+- **Yazıdan veya görselden 3D:** Bir tariften ya da içe aktarılan görselden yerel bir kontrol görseli oluşturun. Kontrol edip onayladıktan sonra 3D model üretin ve önizleyin. Görsel tarzını ve tek ana konu seçeneğini belirleyin. 3MF, STL veya OBJ olarak kaydedin.
+- **Yerel işlem:** Kurulan yapay zekâ modelleri üretim API anahtarı olmadan seçilen bilgisayarda çalışır. Model dosyaları isteğe bağlıdır ve ilk kurulum sırasında indirilir.
+- **Yerel ağ erişimi:** Paketle gelen web sunucusunu başlatarak aynı ağdaki tarayıcılardan vektör ve düzenleme alanlarına erişin. Yerel yapay zekâ üretimi sunucuyu çalıştıran bilgisayarda yapılır.
+- **macOS:** GitHub Releases bölümünden Apple Silicon veya Intel işlemcinize uygun paketi indirin.
 
-AI-generated shapes and hidden surfaces are estimates. Review the preview and exported mesh before fabrication. Image-to-relief conversion follows the source artwork; details absent from the image are not reconstructed.
+Yapay zekâ ile üretilen şekiller ve görünmeyen yüzeyler tahmindir. Üretimden önce önizlemeyi ve dışa aktarılan ağı kontrol edin. Görselden kabartma dönüşümü kaynak deseni izler; kaynakta bulunmayan ayrıntılar yeniden oluşturulmaz.
 
-## Launch
+## Windows’ta açma
 
-On Windows, open `Baslat.bat` or `Masaustu/Katman Studio/Katman Studio.exe`. Keep the packaged application folder together when moving it. The vector and mesh-editing workspaces run locally and do not require a browser, server, or network connection.
+`Baslat.bat` veya `Masaustu/Katman Studio/Katman Studio.exe` dosyasını açın. Uygulamayı taşırken paket klasörünün tamamını birlikte taşıyın. Vektör ve 3D düzenleme alanları yerel çalışır; tarayıcı, sunucu veya ağ bağlantısı gerekmez.
 
-The first local AI model setup requires an internet connection. Once installed, generation runs locally. Model files are stored outside the repository and are not included in the application package.
+Yerel yapay zekâ modelinin ilk kurulumu internet bağlantısı ister. Modeller kurulduktan sonra üretim yerel yapılır. Model dosyaları Git deposunun dışında tutulur ve uygulama paketine eklenmez.
 
-## Local network browser access
+## Yerel ağdan tarayıcıyla kullanma
 
-On Windows, open `Masaustu/Katman Studio/Web-Sunucusu-Baslat.bat`. The console lists the local addresses to use from another device on the same network. Keep the server window open while connecting. Use `Ctrl+C` to stop the server.
+Windows’ta `Masaustu/Katman Studio/Web-Sunucusu-Baslat.bat` dosyasını açın. Konsolda aynı ağdaki diğer cihazlarda kullanabileceğiniz yerel adresler görünür. Bağlantı boyunca sunucu penceresini açık tutun. Sunucuyu durdurmak için `Ctrl+C` kullanın.
 
-To run from source, use `npm run start:web -- --lan --open`. Without `--lan`, the server is only available on the current computer.
+Kaynak koddan başlatmak için `npm run start:web -- --lan --open` komutunu çalıştırın. `--lan` kullanılmazsa sunucu yalnızca aynı bilgisayardan erişilebilir.
 
 ## macOS
 
-Download a DMG or ZIP for the Mac's processor from the repository's Releases page. Move the application to Applications. The first launch may show a security notice because the packages are not notarized.
+Mac işlemcinize uygun DMG veya ZIP paketini GitHub Releases bölümünden indirin ve uygulamayı Applications klasörüne taşıyın. Paketler notarize edilmediğinden ilk açılışta macOS güvenlik bildirimi gösterebilir.
 
-To build from source:
+Kaynak koddan paketlemek için:
 
 ```sh
 npm ci
@@ -39,41 +39,41 @@ npm run package:mac -- --arm64  # Apple Silicon
 npm run package:mac -- --x64    # Intel
 ```
 
-## Image to relief workflow
+## Görselden kabartma oluşturma
 
-1. Open a PNG, JPG, WEBP, BMP, SVG, or another supported image.
-2. Review the vectorized artwork and 3D preview.
-3. Select a region on the canvas, or select matching/nearby colors.
-4. Set a relief height from 0 to 250 mm, in 0.02 mm increments.
-5. Export in the desired format.
+1. PNG, JPG, WEBP, BMP, SVG veya desteklenen başka bir görseli açın.
+2. Oluşturulan vektör deseni ve 3D önizlemeyi inceleyin.
+3. Çalışma alanından tek bir bölge, aynı renkli bölgeler veya yakın tonlar seçin.
+4. 0–250 mm arasında, 0,02 mm adımlarla kabartma yüksekliği belirleyin.
+5. İstediğiniz biçimde dışa aktarın.
 
-Disconnected regions with the same color can be adjusted individually or together. Background removal can be switched on or off before processing.
+Teması olmayan aynı renkli bölgeler ayrı ayrı veya birlikte ayarlanabilir. Arka planı kaldırma işlemi dönüştürme öncesinde açılıp kapatılabilir.
 
-3MF retains color regions and relief geometry. STL contains geometry without color. OBJ exports geometry with an MTL file. SVG preserves editable vector paths.
+3MF renkli bölgeleri ve kabartma geometrisini korur. STL geometriyi renksiz kaydeder. OBJ, geometriyi bir MTL dosyasıyla birlikte dışa aktarır. SVG düzenlenebilir vektör yollarını korur.
 
-## 3D model editing
+## 3D model düzenleme
 
-Open an STL, 3MF, or OBJ file in **3D model editing**. Use the point selection tool to outline an area. Choose an operation to cut, flatten, or fill the selected area. Set a reference surface when an operation should align to an existing plane. Use Undo and Redo to review edits before export.
+**3D model düzenle** alanında STL, 3MF veya OBJ dosyası açın. Nokta seçme aracıyla alanın çevresini işaretleyin. Seçili alanı kesme, düzleme veya doldurma işlemlerinden birini uygulayın. İşlemin mevcut bir düzleme hizalanması gerekiyorsa önce referans yüzey seçin. Dışa aktarmadan önce Geri Al ve Yinele ile değişiklikleri kontrol edin.
 
-The editor performs local surface operations; it does not automatically recognize text or infer curved surfaces beyond the selected region. Inspect the preview and check the mesh in the intended slicer before printing.
+Düzenleyici yerel yüzey işlemleri uygular; yazıları kendiliğinden tanımaz ve seçili alan dışındaki eğri yüzeyi tahmin etmez. Baskıdan önce önizlemeyi inceleyin ve ağı hedef dilimleyicide kontrol edin.
 
-## Local text/image to 3D
+## Yerel yapay zekâ ile yazıdan veya görselden 3D
 
-Enter a description or load an image to prepare a 2D concept. Select the visual style, review the generated concept, and approve it before starting 3D generation. The local models are general-purpose image and shape generators: prompts and model outputs can vary, and a chosen style or subject count cannot guarantee exact results. Generate another variation or edit the description when needed.
+Bir tarif yazın veya görsel yükleyerek 2D kontrol görseli hazırlayın. Görsel tarzını seçin, sonucu inceleyin ve 3D üretimine geçmeden önce onaylayın. Yerel modeller genel amaçlı görsel ve şekil üreticileridir; aynı tarif farklı sonuçlar verebilir. Seçilen tarz veya konu sayısı birebir sonuç garantisi vermez. Gerekirse yeni varyasyon üretin veya tarifi düzenleyin.
 
-## Source development
+## Kaynak koddan geliştirme
 
-Requires Node.js and npm. To launch the application from source:
+Node.js ve npm gereklidir. Uygulamayı kaynak koddan başlatmak için:
 
-```sh
+```powershell
 npm install
 node node_modules/electron/install.js
 npm run build
 npm start
 ```
 
-To create a Windows desktop package, run `npm run package:desktop`.
+Windows masaüstü paketi oluşturmak için `npm run package:desktop` komutunu kullanın.
 
-## AI model licenses
+## Yapay zekâ model lisansları
 
-Each model is downloaded from its publisher's repository at a pinned revision and verified during installation. Model weights are not included in this repository. Check each model's repository for its license and usage conditions before installing it.
+Her model, yayıncısının deposundaki sabit bir sürümden indirilir ve kurulum sırasında doğrulanır. Model ağırlıkları bu depoya eklenmez. Bir modeli kurmadan önce yayıncısının deposundaki lisans ve kullanım koşullarını inceleyin.
