@@ -32,7 +32,16 @@ test('image engine selects XL only when installed and hardware capacity permits'
  assert.throws(()=>imageEngineFor({requested:'xl',installed:true,resources}),/RAM/);
  assert.throws(()=>imageEngineFor({requested:'xl',installed:false,resources}),/kurun/);
  assert.equal(imageEngineFor({installed:true,resources:{ramGB:32,freeGB:20}}),'xl');
- assert.equal(imageEngineFor({installed:true,gpu:{memoryGB:12},resources,precision:'float32'}),'turbo');
+ assert.throws(()=>imageEngineFor({installed:true,gpu:{memoryGB:12},resources,precision:'float32'}),/Otoma/);
+});
+test('style and precision choose the appropriate installed quality model without a hidden float32 downgrade',()=>{
+ const resources={ramGB:16,freeGB:6},gpu={memoryGB:12},models={installed:true,realisticInstalled:true,baseInstalled:true,gpu,resources};
+ assert.equal(imageEngineFor({...models,imageStyle:'realistic'}),'realistic');
+ for(const imageStyle of ['auto','caricature','cartoon','anime','clay'])assert.equal(imageEngineFor({...models,imageStyle}),'base');
+ assert.throws(()=>imageEngineFor({...models,imageStyle:'realistic',precision:'float32'}),/hafif motora geçilmedi/);
+ assert.equal(imageEngineFor({...models,requested:'base'}),'base');
+ assert.throws(()=>imageEngineFor({...models,requested:'base',baseInstalled:false}),/kurun/);
+ assert.equal(imageEngineFor({...models,resources:{ramGB:32,freeGB:20},imageStyle:'cartoon',precision:'float32'}),'base');
 });
 const gib=1024**3;
 test('resource policy adapts to total RAM, available RAM and CPU count without changing geometry quality',()=>{
@@ -45,11 +54,11 @@ test('resource policy adapts to total RAM, available RAM and CPU count without c
 });
 test('backend selection depends on graphics adapter and platform, independent of CPU manufacturer',()=>{
  assert.equal(backendFor([{name:'NVIDIA GeForce RTX 4060'},{name:'AMD Radeon Graphics'}],'win32'),'cuda');
- assert.equal(backendFor([{name:'AMD Radeon RX 6700 XT'}],'win32'),'rocm');
+ assert.equal(backendFor([{name:'AMD Radeon Graphics'}],'win32'),'rocm');
  assert.equal(backendFor([{name:'Intel UHD Graphics'}],'win32'),null);
  assert.equal(backendFor([{name:'Apple M3'}],'darwin'),null);
  assert.equal(backendFor([{name:'NVIDIA RTX 4090'}],'linux'),'cuda');
- assert.equal(backendFor([{name:'AMD Radeon RX 6700 XT'}],'linux'),null);
+ assert.equal(backendFor([{name:'AMD Radeon Graphics'}],'linux'),null);
 });
 test('small PCs and software graphics reduce preview cost, while large machines keep detailed shadows',()=>{
  assert.deepEqual(previewProfile({memoryGB:4,cores:4}),{pixelRatio:1,shadowSize:1024});

@@ -7,6 +7,7 @@ SHAPE = 'f90a0f7df7d5e6f71109cf333f6a95a0ae3194a6'
 IMAGE = 'b261bac6fd2cf515557d5d0707481eafa0485ec2'
 IMAGE_XL = '71153311d3dbb46851df1931d3ca6e939de83304'
 IMAGE_REALISTIC = '26dfe44930964cd70d0a817b6d1cc945c130e38d'
+IMAGE_BASE = '462165984030d82259a11f4367a4eed129e94a7b'
 VAE_XL_FP16 = '207b116dae70ace3637169f1ddd2434b91b3a8cd'
 
 def file_hash(path):
@@ -79,7 +80,7 @@ def reuse_encoder(url,target,source,size,digest,minimum_bytes=256*1024**2):
     finally:temporary.unlink(missing_ok=True)
 
 
-def repo_download(repo,revision,root,patterns,reuse=False):
+def repo_download(repo,revision,root,patterns,reuse=False,reuse_roots=()):
     from huggingface_hub import HfApi
     from concurrent.futures import ThreadPoolExecutor
     info=HfApi().model_info(repo,revision=revision,files_metadata=True)
@@ -91,6 +92,11 @@ def repo_download(repo,revision,root,patterns,reuse=False):
             return download(url,target,digest)
         if target.exists() and target.stat().st_size==size and file_hash(target)==digest:
             target.with_suffix(target.suffix+'.part').unlink(missing_ok=True);return
+        for reuse_root in reuse_roots:
+            source=reuse_root/name
+            if source.exists() and source.stat().st_size==size and file_hash(source)==digest:
+                target.parent.mkdir(parents=True,exist_ok=True);copy=target.with_suffix('.copy');shutil.copyfile(source,copy);copy.replace(target)
+                target.with_suffix(target.suffix+'.part').unlink(missing_ok=True);return
         if reuse:
             source=root / name.replace('hunyuan3d-dit-v2-mini/','hunyuan3d-dit-v2-mini-turbo/').replace('hunyuan3d-vae-v2-mini/','hunyuan3d-vae-v2-mini-turbo/')
             if source!=target and source.exists():
@@ -202,6 +208,20 @@ def image_xl_models(home):
     marker.write_text(json.dumps({'engine':'sdxl-turbo','revision':IMAGE_XL}),encoding='utf-8');marker.replace(home/'ready-image-xl.json')
     report('SDXL-Turbo görsel motoru hazır.',ready=True)
 
+def base_image_models(home):
+    report('Genel çizim motoru · SDXL Base indiriliyor · yaklaşık 7 GB…')
+    repo_download('stabilityai/stable-diffusion-xl-base-1.0',IMAGE_BASE,home/'models-v2'/'image-base',[
+        'model_index.json','scheduler/*.json','tokenizer/*','tokenizer_2/*',
+        'text_encoder/config.json','text_encoder/model.fp16.safetensors',
+        'text_encoder_2/config.json','text_encoder_2/model.fp16.safetensors',
+        'unet/config.json','unet/diffusion_pytorch_model.fp16.safetensors',
+        'vae/config.json','vae/diffusion_pytorch_model.fp16.safetensors','LICENSE*','README.md'],reuse_roots=[home/'models-v2'/'image-xl'])
+    repo_download('madebyollin/sdxl-vae-fp16-fix',VAE_XL_FP16,home/'models-v2'/'image-realistic-vae',[
+        'config.json','diffusion_pytorch_model.safetensors','README.md','LICENSE*'])
+    marker=home/'ready-image-base.json.tmp'
+    marker.write_text(json.dumps({'engine':'sdxl-base','revision':IMAGE_BASE,'vaeRevision':VAE_XL_FP16}),encoding='utf-8');marker.replace(home/'ready-image-base.json')
+    report('Genel çizim motoru · SDXL Base hazır.',ready=True)
+
 def realistic_models(home):
     report('RealVisXL gerçekçi görsel motoru indiriliyor · yaklaşık 7 GB…')
     repo_download('SG161222/RealVisXL_V4.0',IMAGE_REALISTIC,home/'models-v2'/'image-realistic',[
@@ -217,10 +237,11 @@ def realistic_models(home):
     report('RealVisXL gerçekçi görsel motoru hazır.',ready=True)
 
 if __name__=='__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('--home',required=True);parser.add_argument('--models',action='store_true');parser.add_argument('--quality-models',action='store_true');parser.add_argument('--image-xl-models',action='store_true');parser.add_argument('--realistic-models',action='store_true');args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--home',required=True);parser.add_argument('--models',action='store_true');parser.add_argument('--quality-models',action='store_true');parser.add_argument('--image-xl-models',action='store_true');parser.add_argument('--realistic-models',action='store_true');parser.add_argument('--base-image-models',action='store_true');args=parser.parse_args()
     try:
         home=pathlib.Path(args.home).resolve()
-        if args.realistic_models:realistic_models(home)
+        if args.base_image_models:base_image_models(home)
+        elif args.realistic_models:realistic_models(home)
         elif args.image_xl_models:image_xl_models(home)
         elif args.quality_models:quality_models(home)
         elif args.models:models(home)

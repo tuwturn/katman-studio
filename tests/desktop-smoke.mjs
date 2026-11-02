@@ -5,7 +5,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import {unzipSync,strFromU8} from 'fflate';
 const require=createRequire(import.meta.url);
-let driver;if(process.env.PLAYWRIGHT_PATH)driver=require(process.env.PLAYWRIGHT_PATH);else{try{driver=require('playwright');}catch{driver=require('C:/Users/tuwturn/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');}}
+let driver;if(process.env.PLAYWRIGHT_PATH)driver=require(process.env.PLAYWRIGHT_PATH);else driver=require('playwright');
 const {_electron}=driver;
 const executablePath=process.env.KATMAN_EXECUTABLE||path.resolve(process.platform==='darwin'?`dist/${process.arch==='arm64'?'mac-arm64':'mac'}/Katman Studio.app/Contents/MacOS/Katman Studio`:'Masaustu/Katman Studio/Katman Studio.exe');
 await mkdir('test-results',{recursive:true});

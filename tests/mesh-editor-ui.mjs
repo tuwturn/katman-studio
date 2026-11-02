@@ -8,7 +8,7 @@ import {STLLoader} from 'three/addons/loaders/STLLoader.js';
 import {fromSolid,toSolid} from '../src/mesh-ops.js';
 import {exportSTL,export3MF,exportOBJ} from '../src/core.js';
 import {unzipSync,zipSync,strFromU8,strToU8} from 'fflate';
-const require=createRequire(import.meta.url),{chromium,_electron}=require(process.env.PLAYWRIGHT_PATH||'C:/Users/tuwturn/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const require=createRequire(import.meta.url),{chromium,_electron}=require(process.env.PLAYWRIGHT_PATH||'playwright');
 const wasm=await Module();wasm.setup();const M=wasm.Manifold;await mkdir('test-results',{recursive:true});
 const outer=M.cube([30,30,12]),hole=M.cube([26,26,12]).translate([2,2,2]),cup=outer.subtract(hole),letter=M.cube([4,2,1]).translate([13,14,2]),source=cup.add(letter),part={...fromSolid(source,{name:'Inner lettering'}),color:'#80a7db'};
 await writeFile('test-results/mesh-cup.stl',exportSTL([part]));await writeFile('test-results/mesh-cup.3mf',export3MF([part]));await writeFile('test-results/mesh-cup.obj',unzipSync(exportOBJ([part]))['model.obj']);

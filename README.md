@@ -1,269 +1,79 @@
-# Katman Studio 3.16 — Otomatik görselden vektör ve 3D
+# Katman Studio
 
-Uygulama boş açılır. Görseli ekleyin; renk ayrımı, düzgün vektör eğrileri ve ayrıntı kalitesi otomatik hazırlanır. Piksel çözünürlüğü, kenar filtresi, gölge veya Z büyütme ayarı yapmanız gerekmez.
+Katman Studio is a desktop application for converting raster artwork into editable vector regions and 3D reliefs, editing existing 3D models, and creating 3D concepts from text or images with local AI models.
 
-## 3.16 — Gerçekçi insan ve nesne için kalite motoru
+## Features
 
-**Yazıdan görsel motoru → RealVisXL · gerçekçi kalite** seçeneği, SDXL-Turbo'dan ayrı [RealVisXL V4.0](https://huggingface.co/SG161222/RealVisXL_V4.0) ağırlıklarını kullanır. Modelin yayımlayıcısı gerçekçi görüntüyü hedeflediğini ve DPM++ 2M Karras ile en az 25 adım önerdiğini belirtir. Bu sürümde 30 adım, CFG 5 ve DPM++ 2M Karras kullanılır. Nesne kadrajı 1024 × 1024, insan figürü kadrajı 768 × 1344'tür; piksel alanları benzerdir. Turbo modellerinin adımı artırılıp yeni motor gibi sunulmaz. Kontrol görseli daha uzun sürede üretilir; daha yüksek ayrıntı veya gerçekçi model adı her tarifte doğru anatomi garantisi değildir.
+- **Image to vector and relief:** Import common image formats, trace smooth vector boundaries, select individual regions or nearby colors, assign relief heights, preview the result, and export 3MF, STL, OBJ, or SVG.
+- **3D model editing:** Open STL, 3MF, and OBJ files. Select surface areas with points, remove raised sections, flatten or fill areas, undo edits, and export the result.
+- **Text or image to 3D:** Generate a local 2D concept from a text description or an imported image, review it, then create and preview a 3D model. Choose a visual style and whether the description should focus on one subject. Export 3MF, STL, or OBJ.
+- **Local processing:** Installed AI models run on the selected computer without a generation API key. Model downloads are optional and take place during setup.
+- **Local network access:** Run the bundled web server to use the vector and editing workspaces from browsers on the same network. Local AI generation runs on the computer hosting the server.
+- **macOS:** Download the matching Apple Silicon or Intel package from GitHub Releases.
 
-İsteğe bağlı modeller bölümünden yaklaşık 7,3 GB indirilir. API anahtarı gerekmez; kurulumdan sonra üretim çevrimdışıdır. Ağırlıklar `SG161222/RealVisXL_V4.0` deposunun sabit `26dfe44930964cd70d0a817b6d1cc945c130e38d` revizyonundan gelir; tam SHA-256 doğrulaması ve tüm dosyalar bitmeden kurulum işaretçisi yazılmaz. Model kartındaki Open RAIL++ lisansı geçerlidir. Yarım indirmeler devam eder; aralık aktarımında aynı 96 MB pencere içinde daha küçük bloklar kullanılır.
+AI-generated shapes and hidden surfaces are estimates. Review the preview and exported mesh before fabrication. Image-to-relief conversion follows the source artwork; details absent from the image are not reconstructed.
 
-Gerçekçi mod, özgün tarifin önüne fotoğraf sunumu ve doğal oran yönlendirmesi koyar; belirli bir kıyafet, malzeme veya hazır karakter eklemez. Çizim/tek renk gibi açık tarifler korunur. Bozuk anatomi, ekstra uzuv ve bulanıklık için negatif tarif kullanılır; bu yönlendirme sonuç denetimi veya otomatik anatomi onarımı değildir. Etkin motor ve pozitif tarif arayüzden görülebilir. Negatif tarif, adım, çözünürlük ve kaynak model üretim kaydına ve önbellek kimliğine dahildir.
+## Launch
 
-Kadraj seçimi için modelin mevcut CLIP metin kodlayıcısı tarifi insan/nesne/hayvan/manzara kavramlarıyla karşılaştırır. İnsan olarak değerlendirilen tariflerde dikey tam figür sunumu kullanılır; nesne şekli, hazır insan modeli veya çizim şablonu seçilmez. Bu yardımcı sınıflama da yanılabilir. Açık portre/büst/yakın plan tarifi kare kadrajı ve yakın planı korur. Gerçek ağırlıklarla çocuk ve tırpanlı köylü tariflerinde figür; sandalye ve şapkalı ördekte nesne kadrajı seçimi sınandı. Bu ayrım nesnenin 3D geometrisini kendisi üretmez.
+On Windows, open `Baslat.bat` or `Masaustu/Katman Studio/Katman Studio.exe`. Keep the packaged application folder together when moving it. The vector and mesh-editing workspaces run locally and do not require a browser, server, or network connection.
 
-Görüntü çözümü örneklemeden ayrılır; önce büyük UNet ve metin kodlayıcıları bırakılır. [SDXL VAE FP16 Fix](https://huggingface.co/madebyollin/sdxl-vae-fp16-fix), sabit `207b116dae70ace3637169f1ddd2434b91b3a8cd` revizyonundan ayrıca doğrulanır (MIT lisansı). Bu SDXL uyumlu bileşen FP16'da taşmayı önlemek için düzenlenmiştir; asıl VAE ile küçük çıktı farkları olabilir. GPU'da otomatik hassasiyet bu çözücüyü FP16 kullanabilir; CPU FP32 kalır. 512 px örtüşen VAE parçaları en büyük bellek ihtiyacını sınırlar. Bellek/sayısal sorununda aynı latent biçim CPU'da FP32 çözülür; örnekleme tekrar edilmez. Windows gfx10 ROCm'de zorunlu FP32 VAE CPU'ya yönlenir: gerçek ilk denemede MIOpen FP32 GPU evrişimi süreç çökmesine yol açtı. Bu, bütün üretimin CPU'ya alındığı anlamına gelmez. Gerçekçi moda ait önbellek, bu ayrı çözücünün kimliğini de içerir. İlerleme, GPU adımının tamamlanmasını bekler.
+The first local AI model setup requires an internet connection. Once installed, generation runs locally. Model files are stored outside the repository and are not included in the application package.
 
-Otomatik seçim, kuruluysa ve donanım uygunsa gerçekçi motora öncelik verir: GPU'da yaklaşık 16 GB RAM, en az 4 GB boş RAM ve 8 GB VRAM; CPU'da en az 24 GB RAM ve 16 GB boş RAM. Açık seçimde 4 GB VRAM ile sırayla bileşen aktarımı denenebilir; daha yavaş olabilir ve her kartta başarı garantisi değildir. Daha az bellekte hızlı motorlar kullanılabilir. Açık RealVisXL seçimi sessizce Turbo'ya geçmez; otomatik moddaki hassasiyet geri dönüşü kullanıcıya bildirilir. CPU/NVIDIA/AMD yolları korunur; farklı fiziksel kartlarda yeni uçtan uca doğrulama yapılmış sayılmaz.
+## Local network browser access
 
-Yüklenen resim yeniden çizilmez. Kontrol görselini onaylayarak Hunyuan ile 3D üretim, tek renk geometri, STL/3MF/OBJ çıkışı ve boş açılış davranışı korunur. Bu değişiklik 3D yüzey motorunu veya doku boyamayı değiştirmez.
+On Windows, open `Masaustu/Katman Studio/Web-Sunucusu-Baslat.bat`. The console lists the local addresses to use from another device on the same network. Keep the server window open while connecting. Use `Ctrl+C` to stop the server.
 
-**Gerçek doğrulama:** Windows RX 6700 XT / 16 GB RAM üzerinde paketli uygulamada aynı `çocuk` tarifi ve `1849108937` varyasyonu kullanıldı. Dikey tam figür, yüz/saç/kıyafet ayrıntılarıyla **126,281 saniyede** üretildi; kaynak motorunun RealVisXL olduğu doğrulandı. Hunyuan dengeli 3D üretimi **79,924 saniye**, 82.890 köşe / 165.832 üçgen verdi. STL ve 3MF kaydedildi; STL yeniden açıldığında 100 mm, tutarlı yüz yönleri ve kapalı yüzey doğrulandı. Bu tek örneğin kapalı olması diğer çıktıların kapalı/baskıya hazır olacağını garanti etmez. Ayrı `ahşap sandalye` denemesi kare kadrajda **101,802 saniyede** doğal ahşap görünümü üretti. Yeni oturum eski sonuç dosyaları mevcutken boş açıldı, tamamlanan kurulumlar gizli kaldı ve kullanıcının asıl sonuç dosyaları değiştirilmedi. İnsan modelindeki ince yüz/parmak geometri ayrıntıları Hunyuan Mini ile sınırlıdır. Sayısal süreler bu makineye aittir; tüm tarifler veya başka fiziksel donanımlar için kalite/hız garantisi değildir.
+To run from source, use `npm run start:web -- --lan --open`. Without `--lan`, the server is only available on the current computer.
 
-## 3.15 — Kontrol görselinde daha güçlü yerel motor
+## macOS
 
-Önceki SD-Turbo akışında otomatik eklenen `intricate details`, heykel ve ürün fotoğrafı yönlendirmeleri istenmeyen yüzey görünümünü etkiliyordu. Bunlar kaldırıldı. Aynı sorunlu “insan” isteği CPU ve GPU tam hassasiyette de benzer kaba doku üretti; indirilen SD-Turbo dosyalarının tamamı resmî sabit revizyonla eşleşti. Yalnızca hassasiyet veya daha çok adım sorunu çözmedi. Hafif SD-Turbo artık 1 adım kullanır; bu örneklerde 4 adım daha fazla tekrarlı doku oluşturdu.
+Download a DMG or ZIP for the Mac's processor from the repository's Releases page. Move the application to Applications. The first launch may show a security notice because the packages are not notarized.
 
-Yeni **Görsel motoru** seçeneği daha güçlü [SDXL-Turbo](https://huggingface.co/stabilityai/sdxl-turbo) modelini 4 adımda yerelde çalıştırır. İsteğe bağlı kurulum yaklaşık 7 GB indirir; API anahtarı veya bulut üretimi gerekmez. Modelin kendi lisans koşulları geçerlidir. Dosyalar sabit `71153311d3dbb46851df1931d3ca6e939de83304` revizyonundan indirilir ve SHA-256 doğrulanır. Kurulum tamamlanmadan motor hazır sayılmaz. İndirici aralık indirmesini ve yarım dosyadan devam etmeyi korur.
-
-**Otomatik** seçim, SDXL kuruluysa ve uygun bellek varsa onu kullanır: GPU için yaklaşık 16 GB RAM / 8 GB VRAM; CPU için en az 24 GB RAM ve 16 GB boş bellek. Açık SDXL seçiminde 4 GB VRAM ile bileşenleri sırayla taşıma denenebilir; bu alt sınır her kartta başarı veya hız garantisi değildir. GPU FP16, bellek durumuna göre CPU aktarımı, attention/VAE bellek tasarrufu kullanılır. Tam hassasiyet daha çok RAM ister. Otomatik modda FP16 başarısız olursa ve tam SDXL için RAM yetmezse hafif motora geçildiği açıkça bildirilir. Kullanıcı açıkça SDXL seçtiyse gizlice başka görsel motoruna geçilmez. CPU/NVIDIA/AMD yönlendirmeleri korunur; bu sürümün gerçek SDXL denemesi Windows RX 6700 XT / 16 GB RAM üzerinde yapıldı.
-
-Kaynak motor adı kontrol görselinin yanında görünür; uygulanan tam tarif ayrıca açılabilir. Yalnızca tek başına çevrilmiş `human` / `human being`, belirsiz anatomi çağrışımını azaltmak için `a person` olur; `human skeleton` gibi açık tarifler korunur. Hazır insan/ördek şekli seçilmez. Kullanıcının malzeme ve siyah-beyaz isteği korunur; otomatik özel malzeme eklenmez. Motor, adım ve yeni tarif sürümü önbellek anahtarına dahildir; eski sorunlu görsel yeni üretimde kullanılmaz. Yüklenen fotoğraf bu görsel motorunda tekrar çizilmez.
-
-**Gerçek doğrulama:** Aynı “insan” isteği ve aynı varyasyon numarası, paketli masaüstü arayüzünde normal kıyafetli bir kişi üretti; eski örgü görünümü görülmedi. Kontrol görseli 38,052 saniye, Hunyuan taslak 3D üretimi 66,060 saniye sürdü. 78.270 üçgenli model STL ve 3MF olarak kaydedildi. STL tekrar açıldığında 100 mm ve tutarlı yüz yönleri doğrulandı; bu örnek kapalı katı değildi (2 sınır ve 4 çoklu bağlantılı kenar). Kapalı/baskıya hazır geometri garantisi verilmez. Sandalye denemesi doğal çıktı; ayrı şapkalı ördek denemesinde çift baş hatası vardı. Daha güçlü motor anatomiyi, bütün tarifleri veya görünmeyen yüzeyleri kusursuz yapmaz. 3D çıktı hâlâ tek renk geometridir; doku boyama eklenmedi.
-
-Boş açılış, tamamlanan kurulumları gizleme, görselden vektör/kabartma ve ayrı 3D düzenleme alanları korunur. Eski görseller diskte tutulur; yeni motorla sonuç görmek için yeniden üretin.
-
-## Açma
-
-**Baslat.bat** dosyasını veya **Masaustu/Katman Studio/Katman Studio.exe** dosyasını açın. Görsel dönüştürme ve 3D düzenleme için hazır Windows paketi Node.js, internet, sunucu veya tarayıcı gerektirmez. Yazıdan 3D motorunun ilk kurulumunda Python 3.10–3.12 ve internet gerekir; sonraki üretimler yereldir. EXE'yi taşırken yanındaki dosyaları da içeren klasörün tamamını taşıyın.
-
-## 3D model düzenleme
-
-Üstteki **3D model düzenle** sekmesi ayrı bir çalışma alanıdır; görselden kabartma çalışması sekmeler arasında korunur. STL, 3MF ve OBJ dosyası açılabilir; çıktı STL, renkli 3MF veya OBJ + MTL ZIP olarak kaydedilir. Dosya kaynakta değiştirilmez. Modelin konumu ve mm ölçüleri korunur; ızgara modelin altına yerleşir. **Modeli zemine ortala** düğmesi istenirse modeli XY merkezine ve Z=0 zeminine taşır; bu işlem kamera konumuyla birlikte geri alınabilir; 3MF birimleri mm’ye dönüştürülür. STL/OBJ birimsiz olduğundan mm kabul edilir. Dosya sınırı 100 MB / 1,5 milyon üçgendir. Harici OBJ MTL/doku dosyaları içeri alınmaz.
-
-1. Gerekirse sağdan **Kesit görünümü** ile ön yüzeyleri gizleyin ve iç kısma ulaşın. Bu sadece görüntüdür; dışa aktarılan model kesilmez.
-2. **Düz yüzeyden referans seç** ile yazının yanındaki temiz zemine / iç duvara tıklayın. **Yüzeye bak** görünümü bu yüzeye çevirir. Mavi ok işlem yönünü gösterir.
-3. **Noktalarla alan seç** ile sınır noktalarını sırayla tıklayın. İlk noktaya tekrar tıklayın veya Enter ile kapatın; taralı alan işlem görecektir. Backspace son noktayı geri alır. Düzleme/doldurma için önce temiz yüzeyden referans seçin; tam kesimde görünüm düzlemi yeterlidir. İsteğe bağlı kutu ve daire araçları da bulunur. Alanı yalnızca kaldırılacak yazıyla sınırlayın.
-4. Derinliği yazıyı kapsayacak şekilde ayarlayıp **Çıkıntılı yazıyı düzle** veya **Çukur yazıyı doldur** seçin. Ofset 0, referans yüzey seviyesidir. Yön yanlışsa ters çevrilebilir. İşlem seçilen parçada, seçilen alan ve derinlikle sınırlıdır; sonsuz bir düzlemle bütün gövde kesilmez.
-5. Sarkıtılmış yazı veya bölümü kalınlığı boyunca kaldırmak için **Seçili alanı tamamen kes** kullanılır. Bu işlem sadece kutu/daire ayak izini kaldırır; bütün modeli düzlemle kesmez.
-6. Ayrı duran yazı/harfler için **Bağlantısız parçaları ayır**, sonra parçayı seçip **Seçili parçaları sil** kullanılabilir. Gövdeye kaynaşmış yazı için yerel düzleme kullanılır. Ctrl / ⌘ ile çoklu parça seçilebilir.
-
-Referans modunda sol sürükleme modeli döndürür. Sağ sürükleme modeli döndürür, tekerleğe basılı sürükleme kaydırır, tekerleği çevirme yakınlaştırır; bu kontroller bütün seçim araçlarında çalışır. **Görünümü kaydır** modunda sol sürükleme de kaydırır. **Görünüme sığdır** kamerayı modele getirir.
-
-**Geri al / Yinele** son 12 işlemi tutar. Uzun geometri işlemleri iptal edilebilir; iptal edilen işlem modele uygulanmaz. Düzenleme motoru tarayıcıdaki WebAssembly worker içinde çalışır; model sunucuya yüklenmez ve internet gerekmez.
-
-Araç seçilen yüzeyi **yerel bir düzleme** getirir. Eğri yüzeyin devamını otomatik tahmin etmez ve yazıları otomatik tanımaz. Açık veya tutarsız ağlarda yerel yüzey işlemi denenir ve belirgin uyarı gösterilir. Bu alternatif kaynak dosyanın tüm kusurlarını onarmaz; çıktı kapalı katı olarak garanti edilmez. İşlem sonrası önizlemeyi kontrol edip modelinizi dışa aktarın.
-
-Doğrulama: iç taban yazısı silinirken duvarların hacmi ve sınırları korunur, iç dik duvarda yerel normalle silme, çukur yazı doldurma ve bağlantısız parça ayrımı geometri testleriyle kontrol edilir. `tests/mesh-editor-ui.mjs`, gerçek fare seçimiyle STL/3MF/OBJ içe aktarmayı, iç yüzey düzlemeyi, çıktı hacmini, geri almayı, kesit görünümünü ve sekme korumasını test eder. `KATMAN_NATIVE=1` paketli Windows EXE üzerinde aynı kontrolü yapar. `KATMAN_URL` ile LAN adresi de test edilebilir.
-
-## Yerel ağdan tarayıcıyla kullanım
-
-Windows paketindeki `Masaustu/Katman Studio/Web-Sunucusu-Baslat.bat` dosyasını açın. Node.js kurmaya gerek yoktur; paketli uygulamanın çalışma ortamı kullanılır. Tarayıcı otomatik açılır ve konsolda bu bilgisayarın IP adresleri gösterilir. Aynı Wi-Fi/Ethernet ağındaki diğer bilgisayarlarda gösterilen `http://IP:PORT/` adresini açın. Sunucu penceresi açık kalmalıdır; Ctrl+C ile kapatılır. Varsayılan port 8787’dir; doluysa sonraki boş port seçilir. Özel port için `Web-Sunucusu-Baslat.bat --port 9000` kullanılabilir.
-
-Windows ağ erişim izni sorarsa güvendiğiniz özel yerel ağ için izin verin. Tarayıcılar kendi çalışmalarını tutar; cihazlar arasında proje taşımak için `.katman` dosyasını kaydedip açın. Vektör/kabartma ve model düzenleme istemci tarayıcısında çalışır. Yerel YZ motoru sunucu bilgisayarında çalışır; bu alanda seçilen görsel, aynı yerel ağdaki sunucu bilgisayarına aktarılır. Bulut servisine gönderilmez. YZ motoru ve son YZ üretimi ağ istemcileri arasında ortaktır.
-
-Kaynak koddan aynı kullanım: `npm run start:web -- --lan --open`. `--lan` verilmezse yalnızca bu bilgisayarda (`127.0.0.1`) erişim açılır.
-
-## Mac sürümü
-
-**macOS 13 Ventura veya sonrası** desteklenir. GitHub deposunun **Releases** bölümünden işlemcinize uygun paketi indirin: Apple Silicon için `arm64`, Intel Mac için `x64`. DMG dosyasını açıp **Katman Studio** simgesini **Applications / Uygulamalar** klasörüne sürükleyin. ZIP de aynı uygulamayı içerir. Kullanmak için Node.js veya sunucu kurulmaz.
-
-Mac’te kısayollar ⌘O, ⌘⇧O, ⌘S, ⌘E; çoklu seçim ⌘ ile yapılır. Kırmızı pencere düğmesi pencereyi kapatır; Dock simgesi yeni boş pencere açar. Uygulamadan tamamen çıkış ⌘Q’dur. Kaydedilmeyen çalışma pencere kapanınca kaybolur.
-
-Paketler Apple Developer ID ile imzalanmamış ve notarize edilmemiştir; ilk açılışta macOS güvenlik uyarısı gösterebilir. Resmi imzalı dağıtım için Apple geliştirici sertifikası gerekir.
-
-Mac’te kaynak koddan çalıştırmak ve paketlemek:
+To build from source:
 
 ```sh
 npm ci
 npm run build
 npm start
-# Yalnızca bu Mac’in mimarisi:
 npm run package:mac -- --arm64  # Apple Silicon
 npm run package:mac -- --x64    # Intel
 ```
 
-Mimari seçilmezse iki mimari de paketlenir. Çıktılar `dist/` içine DMG ve ZIP olarak yazılır. `Baslat.command` önceden üretilmiş Mac paketini veya kurulu Electron geliştirme ortamını açar. GitHub Actions, sürüm etiketi (`v*`) gönderildiğinde her mimariyi gerçek Mac runner üzerinde derler, paketlenmiş uygulamanın seçim/kayıt/3MF ve pencereyi yeniden açma testlerini çalıştırır; iki test de geçerse dosyaları Releases bölümüne ekler. Aynı iş akışı Actions bölümünden elle de başlatılabilir (çıktılar Artifacts altında).
+## Image to relief workflow
 
-## Kullanım
+1. Open a PNG, JPG, WEBP, BMP, SVG, or another supported image.
+2. Review the vectorized artwork and 3D preview.
+3. Select a region on the canvas, or select matching/nearby colors.
+4. Set a relief height from 0 to 250 mm, in 0.02 mm increments.
+5. Export in the desired format.
 
-1. **Görsel ekle / Ctrl+O** ile dosyanızı açın veya sol alana sürükleyin. Kaynak görsel solda özgün haliyle gösterilir.
-2. **2D desen** görünümünde oluşan vektörü, **Perspektif / Üstten** görünümünde kabartmayı inceleyin. Konturlar gerçek Bézier eğrileridir; piksel karelerinin sınırlarını olduğu gibi izleyen eski yöntem kaldırıldı.
-3. Çalışma alanından **Tek bölge**, **Aynı renk** veya **Yakın renkler** seçin. Yakın renkler aracındaki renk aralığı sürgüsü, seçilecek benzer tonları belirler. Sağdaki liste sekmeleri yalnızca listeyi gruplar; desenden seçmek için onlara tıklamak gerekmez. Ctrl seçime ekler. 2D görünümde kutu çizerek, 3D'de **Alan seç** aracını açıp sürükleyerek çoklu seçim yapılır.
-4. Sağdan **0–250 mm (25 cm)** arasında yükseklik girin. Sayı girişi 0,02 mm hassasiyetlidir. Artı/eksi düğmeleri hızlı artış ve azalış içindir. 0 mm hacmi kaldırır. Taban kalınlığı ayrıca ayarlanır; toplam yükseklik taban + kabartmadır.
-5. Renkli 3MF, STL, OBJ veya SVG biçimini seçip dosyayı kaydedin.
+Disconnected regions with the same color can be adjusted individually or together. Background removal can be switched on or off before processing.
 
-Aynı renkteki temassız bölgeler ayrı yükseklik alabilir. **Aynı renktekileri seç** seçili renklerin diğer alanlarını da ekler. **Gizle / göster** seçili bölgeleri etkiler. Bir kutu, kesiştiği vektör bölgelerinin tümünü seçer; bir bölgeyi parçalara kesmez.
+3MF retains color regions and relief geometry. STL contains geometry without color. OBJ exports geometry with an MTL file. SVG preserves editable vector paths.
 
-**Kaydet / Ctrl+S** projeyi `.katman` dosyası olarak saklar. **Proje aç / Ctrl+Shift+O** ile yükseklikler ve bölgeler geri gelir. Önceki proje sürümleri desteklenir ve konturlar yeni vektör motoruyla yeniden oluşturulur. Projeler özgün tam boyutlu dosyayı saklamaz; kayıtlı renk kaynağı ile açılır. Eski bir düşük ayrıntılı projeyi en iyi sonuçla yeniden hazırlamak için özgün görseli tekrar yükleyin. Kaydedilmeyen çalışma pencere kapanınca kaybolur.
+## 3D model editing
 
-Sol paneldeki **Arka planı kaldır** anahtarı, dış kenarda baskın olan rengin kenara bağlı bölgelerini kaldırır. Desenin içindeki aynı renkli yazılar ve ayrıntılar korunur. Dikdörtgen taban da kaldırılan arka planın altında bırakılmaz; taban desenin şeklini izler. Anahtarı kapatınca tüm bölgeler ve yükseklikler geri gelir. Bu tercih projede saklanır. Şeffaf kaynaklarda veya belirgin tek renkli bir dış arka plan bulunmadığında renk tahminiyle desen silinmez.
+Open an STL, 3MF, or OBJ file in **3D model editing**. Use the point selection tool to outline an area. Choose an operation to cut, flatten, or fill the selected area. Set a reference surface when an operation should align to an existing plane. Use Undo and Redo to review edits before export.
 
-## Çıktılar
+The editor performs local surface operations; it does not automatically recognize text or infer curved surfaces beyond the selected region. Inspect the preview and check the mesh in the intended slicer before printing.
 
-| Biçim | İçerik |
-| --- | --- |
-| 3MF | Düzgün vektörlerden oluşturulmuş kapalı renkli parçalar, taban, tek montaj ve gerçek mm ölçüleri |
-| STL | Aynı düzgün konturların birleşik dış yüzeyi; iç renk duvarları kaldırılır, renk içermez |
-| OBJ + MTL | Aynı geometri ve renkler, birlikte ZIP; sayısal koordinatlar mm |
-| SVG | Gerçek kübik Bézier yolları, delikler, renkler ve bölge yükseklikleri |
+## Local text/image to 3D
 
-3MF belirli bir yazıcının baskı profilini veya filament atamasını içermez. Dilimleyicide çok parçalı nesne olarak açıp filamentleri renklere eşleştirin. Referans: [3MF Core](https://github.com/3MFConsortium/spec_core), [Materials Extension](https://github.com/3MFConsortium/spec_materials).
+Enter a description or load an image to prepare a 2D concept. Select the visual style, review the generated concept, and approve it before starting 3D generation. The local models are general-purpose image and shape generators: prompts and model outputs can vary, and a chosen style or subject count cannot guarantee exact results. Generate another variation or edit the description when needed.
 
-PNG, JPG, WebP, BMP ve motorun okuyabildiği diğer görseller desteklenir. SVG kaynaklar renk ayrımı için önce örneklenir; çıktı konturları yeniden eğrilere çevrilir. GIF'in ilk karesi kullanılır. Sonuç bir 2,5D kabartmadır. Görseller yerel işlenir, başka bir yere yüklenmez.
+## Source development
 
-## Vektör motoru
+Requires Node.js and npm. To launch the application from source:
 
-Baskın kaynak renkleri algısal renk uzaklıklarıyla otomatik seçilir. Renk sayısı zorlanmadığı için JPEG geçiş tonları ayrı ana renklere dönüştürülmez. Her komşu renk sınırı **bir kez** izlenir. Gerçek tasarım köşeleri korunurken raster basamakları yumuşatılır; Potrace ile en uygun çokgen bulunur, köşeler düzeltilir ve optimize edilmiş çizgi/Bézier parçaları oluşturulur. Renk sınırlarındaki eski özel eğri uydurma kaldırıldı. İki komşu renk aynı sınırı ters yönde kullanır. Sapma ve kesişme denetimleri sınırın başka alanlara taşmasını önler; sorunlu küçük bir parça gerektiğinde yerel olarak korunur.
-
-SVG analitik eğrileri saklar. Ekranda çizim doğrudan vektör yollarından yapılır; 2D tıklamalar `Path2D` ile vektörün içinden test edilir. 3D ve ağ çıktıları aynı eğrilerden hassas şekilde üçgenlenir. Ortak sınırlar ve yükseklik kavşaklarında kenarlar eşlenir; sıfır alanlı yüzeyler atılır. STL, eski piksel yüksekliği alanı yerine aynı düzgün geometriyi kullanır.
-
-Kalite otomatik seçilir; büyük kaynaklar işlem yükünü dengelemek için içeride örneklenir. Raster kaynakta bulunmayan detaylar tahmin edilmez. Köşeden temas eden fiziksel katılar bazı modellerde tek kenarda birden fazla yüzey oluşturabilir; STL çıktısı bu durumu bildirir. Fiziksel baskı ve belirli bir dilimleyiciyle doğrulama bu ortamda yapılmadı.
-
-## Geliştirme
-
-```powershell
+```sh
 npm install
 node node_modules/electron/install.js
 npm run build
 npm start
-npm test
-npm run package:desktop
 ```
 
-İsteğe bağlı tarayıcı geliştirme sunucusu: `npm run start:web` → http://127.0.0.1:8787.
+To create a Windows desktop package, run `npm run package:desktop`.
 
-Testler: bağımsız bölgeler, delikler, rastgele maskelerde alan/hacim, kapalı ağlar, ortak eğrilerin boşluksuz alan kaplaması, sayısal yükseklik ve 250 mm çıktısı, kaynak renklerin korunması, proje uyumu. `tests/ui-smoke.mjs` ve `tests/desktop-smoke.mjs` gerçek arayüz ve EXE akışlarını doğrular. `tests/logo-regression.mjs` verilen logodaki renkleri, küçük yazıları ve vektör sınırlarının dışına taşma olmadığını kontrol eder; yakınlaştırılmış C harfinin görüntüsünü üretir. Playwright yolu `PLAYWRIGHT_PATH`, kullanıcı görseli `TEST_IMAGE` ile değiştirilebilir.
+## AI model licenses
 
-Teknoloji: Electron, Three.js, Earcut, Potrace, fflate, esbuild. Sürümler `package-lock.json` içinde sabitlenmiştir.
-
-2.6 kontur düzeltmesi: Eğri birleştirmesinin ürettiği uzak teğet kesişimleri artık gerçek köşe olarak kullanılmaz. Köşe koruması, özgün çokgen ve kaynak sınırına yakınlık denetimiyle yapılır.  C ve L harflerindeki kenar çıkıntıları için kapalı ve kavşakta kesilen sınırlar Potrace kontur optimizasyonuna geçirildi. Tek noktadan oluşan ve çevresi aynı renkle kaplı JPEG lekeleri otomatik temizlenir. Sınır bir kez üretilip iki renkte ters yönlü paylaşılır. L tabanındaki seyrek raster çıkıntılarının düz bir vektör kenara dönüşmesi için ayrıca regresyon testi vardır. Potrace kaynak uyarlaması `src/vendor/potrace-curves.js`, tam GPL-2.0 lisansı `public/licenses/Potrace.txt` içindedir; matematik çekirdeği node-potrace 2.1.8 kaynaklarından alınmıştır. [Kaynak](https://github.com/tooolbox/node-potrace).
-
-## 3.2 — Görünür işlem sonucu ve kusurlu ağlarda yerel kesim
-
-Kesim/düzleme sırasında ilerleme, süre ve iptal düğmesi gösterilir. Etkisiz seçimler başarılı sayılmaz; belirgin hata verir ve modeli değiştirmez. Geçerli katılar Manifold ile işlenir. Kapalı katı kontrolünden geçemeyen dosyalarda three-bvh-csg ile yerel yüzey işlemi denenir; seçim hacimlerinin dışındaki kaynak üçgenler korunur. Kusurlu kaynak ağın tamamı onarılmaz ve çıktı kapalı katı olarak garanti edilmez; bu durum sonuçta açıkça belirtilir.
-
-Gerçek Gallardo dosyasıyla regresyon: `TEST_MODEL` ortam değişkenini kaynak 3MF yoluna ayarlayıp `node tests/mesh-real-edit.mjs` çalıştırın. Test arayüzden yazıyı keser, dışa aktarılan STL’de kaybolduğunu, uzaktaki üçgenlerin korunduğunu ve geri almanın kaynağı geri getirdiğini doğrular. Model dosyası depoya eklenmez.
-
-## 3.3 — Noktalarla seçim
-
-İçbükey çokgen sınırları desteklenir; kesim çokgenin gerçek içinden yapılır. Çizgileri kesişen seçimler uygulanmaz. Taralı önizleme ve sınır noktaları görünür; Enter / ilk noktaya tıklama seçimi kapatır, Backspace son noktayı geri alır. Tekerleğe basılı sürükleme kaydırır; sağ sürükleme döndürür.
-
-## 3.4 — Alan doldurma ve aynı düzlemde yüzey çizme
-
-Sağdaki **Alan doldur / yüzey çiz** paneli noktalarla çizilen kapalı alana malzeme ekler. **Dolgu düzlemini yüzeyden al** ile mevcut yüzeye tıklayın; seçilmiş alan korunarak bu düzleme izdüşürülür. Üst yüzey aynı düzlemde olur; istenirse referansa göre yükseklik farkı girilir. **Z yüksekliği gir** seçeneğinde üst yüzeyin mutlak Z koordinatı belirlenir. Dolgunun altı modelin ilgili yöndeki alt sınırına kadar uzanır veya kullanıcı tarafından girilen kalınlık kullanılır. **Dolgu hacmini önizle** eklenecek hacmi gösterir. **Seçili alanı doldur** gerçek geometriye ekler; geri alma ve tüm çıktı biçimleri desteklenir. Eğri yüzeyin devamı otomatik tahmin edilmez; referans bir düzlemdir.
-
-`node tests/mesh-fill-ui.mjs` arayüzden yüzey referansı alırken seçimin korunmasını, aynı düzleme doldurmayı, sayısal Z yüksekliğini, önizlemeyi ve STL çıktısındaki hacmi doğrular. `KATMAN_NATIVE=1` ile paketlenmiş EXE üzerinde çalışır.
-
-## 3.5 — Etkileşim ve büyük model performansı
-
-Sabit görünüm sürekli çizilmez; kamera/alan/model değiştiğinde çizilir ve kamera yumuşatması tamamlanınca durur. Görünmeyen çalışma alanları durur. Kapatılmış alan üzerinde fare hareketi dolgu hesabını tekrarlamaz; sabit seçim ve dolgu geometrileri yeniden kullanılır. Taslak fare hareketleri kare başına birleştirilir. Görünüm tamponları ve BVH seçim ağacı arka planda hazırlanır; üçgen sırası ve model geometrisi korunur. Geri alma görünüm tamponlarını yeniden kullanır. Zemine taşıma ve STL/3MF/OBJ üretimi arka planda çalışır. Normal masaüstü açılışı ekran kartını kullanır; yazılımsal çizim yalnızca otomatik testlerde isteğe bağlıdır.
-
-`node tests/mesh-performance.mjs` gerçek modelde hareketsiz çizim sayısını ve kapalı seçim üzerindeki fare hareketi maliyetini ölçer. `TEST_MODEL` dosya yolunu, `PERF_ASSERT=1` performans kontrollerini etkinleştirir. Bu bilgisayarda 340.607 üçgenlik dosyada 600 ms içindeki hareketsiz çizim çağrıları 178’den 0’a, 80 fare hareketinin JavaScript süresi yaklaşık 661 ms’den 1 ms altına indi. Bunlar yerel ölçümlerdir; kesim motorunun toplam süresi veya bütün bilgisayarlar için FPS garantisi değildir.
-
-## 3.6 — Seçimin dışına taşan kesim düzeltmesi
-
-Kusurlu kaynak ağlarda kesim sınıflandırıcısı, seçime kısmen giren uzun yüzeylerin dışarıdaki parçalarını kaybedebiliyordu. Yerel kesim/düzleme artık kaynak üçgenleri seçim prizmasının sınırlarında böler; dış parçalar kaynak koordinatları ve renkleriyle korunur. Kesim kapakları da gerçek seçim sınırına kırpılır. İçbükey, daire, eğik ve örtüşen alanlar desteklenir. Kusurlu kaynağın tamamının onarıldığı veya çıktının kapalı katı olduğu iddia edilmez; mevcut ağ uyarısı sürer. Taralı alanın içinde kalan çerçeve ve diğer geometri kesime dahildir.
-
-Gerçek dosyada çerçeveye taşan seçim regresyonu: `TEST_MODEL` Gallardo 3MF yolunu, `TEST_CUT_INSET=1` içeri taşan alanı seçer; `node tests/mesh-real-edit.mjs` STL çıktısında uzun yüzeylerin dış kısımlarını en yakın yüzey mesafesiyle kontrol eder. `KATMAN_NATIVE=1` masaüstü EXE üzerinde aynı testi çalıştırır. `tests/mesh-clip.test.mjs` uzun üçgenleri, eğik/çokgen/daire kesimleri, renk interpolasyonunu ve örtüşen kapakları kontrol eder.
-
-## 3.7 — Ctrl+Z ve gölgeli derinlik görünümü
-
-Masaüstü Ctrl+Z / ⌘Z, 3D düzenleyicinin geçmişine yönlendirilir. Çizim sırasında son nokta veya kapalı alan, işlem sonrasında geometri geri alınır. Ctrl+Y veya Ctrl+Shift+Z / ⌘Shift+Z yineler; Düzen menüsü de aynı geçmişi kullanır. Metin/sayı girişlerinde geri alma alanın kendi metnini düzenler. Menü ve klavye yolları tek adım uygular; araç çubuğu veya açılır liste odağı kısayolu engellemez.
-
-Gölge / derinlik anahtarı varsayılan açıktır. Yönlü ışık, daha düşük ortam aydınlatması, yüzeyler arası ve zemine düşen yumuşak gölgeler derinlik algısını artırır. Işık kadrajı modele uyar. Gölge haritası model/ışık/kesit değişince yenilenir; sabit görünüm sürekli çizilmez. Bu görsel efektler STL/3MF/OBJ geometrisine eklenmez.
-
-`tests/mesh-fill-ui.mjs` gerçek klavye ile nokta, alan ve iki ardışık geometri işleminin tek tek geri alınıp yinelenmesini; masaüstü menüsünü, metin alanını ve gölge açıp kapatmanın STL’yi değiştirmediğini doğrular.
-
-## 3.8 — Yazıdan 3D, tamamen yerel
-
-**Yazıdan 3D · Yerel YZ** sekmesi, bir bulut API’si yerine OpenAI Shap-E modelini bilgisayarda çalıştırır. [Resmî kaynak ve MIT lisansı](https://github.com/openai/shap-e). Türkçe tarif Helsinki-NLP/opus-mt-tr-en ile yerelde İngilizceye çevrilir; ardından gerçek difüzyon örneklemesi ve 3D yüzey çıkarımı yapılır. Hazır ördek/köylü şekilleri gösterilmez. Model kurulu değilse üretim devre dışıdır ve kurulum istenir.
-
-İlk kurulum Python 3.10–3.12, internet ve birkaç GB boş disk alanı gerektirir. **Yerel motoru kur / tamamla** ayrı bir Python ortamı oluşturur; Windows’ta Python çalışma dosyaları da bağımsız klasöre kopyalanır. Shap-E/CLIP kaynakları sabit commitlerden, resmî ağırlıklar SHA-256 kontrolüyle indirilir. Türkçe çeviri modeli de önceden indirilir. Sonraki üretimlerde ağ soketleri kapatılır; eksik model dosyası olduğunda gizlice internetten indirilmez, hata gösterilir. API anahtarı ve abonelik kullanılmaz.
-
-Bu sürüm işlemciyi kullanır; Windows Radeon RX 6700 XT’de CUDA varsayılmaz. Hesaplama ayrı süreçte ve sınırlı CPU iş parçacığıyla çalışır; arayüz kullanılabilir, üretim durdurulabilir. Üretim birkaç dakika veya daha uzun sürebilir. **Hızlı taslak** / **Daha ayrıntılı** seçenekleri ve varyasyon numarası vardır. Model yüksekliği 1–250 mm’dir. Sonuç gölgeli 3D önizlemede döndürülür; 3MF/STL/OBJ kaydedilir veya mevcut 3D düzenleyiciye aktarılır. Aktarım önceki modeli geri alma geçmişinde tutar.
-
-**Kalite sınırı:** Shap-E deneysel ve görece eski bir yerel modeldir. Basit figürler üretilebilir; gerçekçi insan, yüz/parmak, şapka veya tırpan gibi çoklu ince ayrıntıların tarife tam uyması garanti edilmez. Bu özellik profesyonel karakter modelleme veya baskıya hazır kapalı ağ garantisi vermez. Sonucu önizleyip gerekirse farklı tarif/varyasyon deneyin.
-
-Model ve sonuçlar Windows’ta `%APPDATA%/Katman Studio/Yerel-YZ` altında bulunur; `KATMAN_AI_HOME` ile değiştirilebilir. Hazır motor masaüstünde yerel IPC ile, tarayıcı/LAN kullanımında aynı bilgisayardaki Node sunucusu üzerinden çağrılır. Tarif bulut servisine gönderilmez. Mac’te ayrı Python kurulumu gerekebilir; yerel çıkarım bu geliştirme oturumunda Windows CPU üzerinde doğrulanır, Mac için aynı çıkarım doğrulaması yapılmış sayılmaz.
-
-Geliştirici kurulumu: `python local-ai/install.py --home <model-klasörü>`. Sonra `KATMAN_AI_HOME` bu klasöre ayarlanarak uygulama veya `server.mjs` başlatılabilir. Büyük model dosyaları ve ortam depoya/uygulama paketine eklenmez. `tests/local-ai-ui.mjs` açıkça test verisiyle arayüz/aktarım akışını; `tests/local-ai.test.mjs` istek doğrulamasını ve LAN sınırlarını kontrol eder. Gerçek motor testi ayrıca gerçek ağırlıklar kullanılarak yapılmalıdır.
-
-## 3.9 — Kontrol görseli ve onaydan sonra yerel 3D
-
-Shap-E'nin tarif uyumu yetersiz kaldığı için yeni akış doğrudan Shap-E metin örneklemesini kullanmaz. Serbest Türkçe/İngilizce tarif önce [SD-Turbo](https://huggingface.co/stabilityai/sd-turbo) ile bilgisayarda bir **2D kontrol görseline** dönüştürülür. Kullanıcı doğru bulduğu görseli onayladığında [Hunyuan3D-2 Mini Turbo](https://huggingface.co/tencent/Hunyuan3D-2mini) bu görselden gerçek 3D yüzey üretir. Ördek/köylü düğmeleri kaldırılmıştır; nesne adlarına göre hazır şekil seçilmez. Tarif değişirse eski görselin onayı kullanılamaz. Uzun metnin sonu sessizce kırpılmaz; görsel modelinin metin sınırı aşılırsa kısaltma istenir.
-
-Motor `local-ai/install_v2.py --home <model-klasörü>` ile veya uygulamadaki kurulum düğmesiyle hazırlanır. Sabit model/kaynak sürümleri kullanılır. Büyük ağırlıklar parça parça indirilir ve depo metadatasındaki SHA-256 ile doğrulanır; kesilmiş indirmeler korunur. Yeni hazırlık işareti `ready-v2.json`'dır; eski Shap-E kurulumu yeni motor hazırmış gibi gösterilmez. Sonuçlar `last-concept-v2.json`, `last-model-v2.json` ve `jobs/<uuid>` altında kalır; eski model verisi silinmez.
-
-Çalıştırıcı bütün modelleri aynı anda bellekte tutmaz. Yerel çeviri, görsel üretimi, görüntüden özellik çıkarımı, biçim üretimi ve yüzey çözümü sırayla yapılır. Bu sürüm **işlemciyi** kullanır; AMD ekran kartında CUDA varsayılmaz. Üretim sırasında ağ soketleri ve model indirme yolları kapalıdır. **3D çıktı tek renk geometridir**; kontrol görselinin dokusu/renkleri aktarılmaz. Görselin tarife uyması, 3D arka yüzünün veya ince aksesuarların kusursuz çıkacağını garanti etmez. Üretilen 3D yüzey ayrıca kontrol edilmelidir. Model lisansları yukarıdaki resmî depolarda bulunur; ağırlıklar Git deposuna eklenmez.
-
-`tests/local-ai-ui.mjs` açıkça sahte test verisiyle serbest tarifin iletilmesini, görsel onayı kapısını, değiştirilmiş tarifin reddini, dışa aktarma ve geri almayı sınar. Bu test **YZ kalitesi ölçümü değildir**. Gerçek kurulumla `node tests/local-ai-real.mjs --concept "tarif"` çalıştırılıp oluşan PNG incelenir; ardından `node tests/local-ai-real.mjs --mesh <onaylanan-görsel-uuid>` ile ayrı ve açık bir 3D üretimi yapılır. `--en` İngilizce tarif seçer. Mac çıkarımı bu oturumda doğrulanmış sayılmaz.
-
-Windows CPU üzerinde gerçek doğrulama: aynı Türkçe ördek tarifinin kontrol görseli yaklaşık 72 saniyede, farklı kırmızı çaydanlık tarifinin kontrol görseli 63 saniyede üretildi. Ördek görseli masaüstü arayüzündeki onay düğmesiyle gerçek 3D'ye çevrildi; üretim, önizleme ve çıktı kontrolleri yaklaşık 465 saniye sürdü (hızlı taslak). Bunlar tek bilgisayardaki ölçümlerdir. Yüzey çözümünün üst üste binen/sıfır alanlı üçgenleri çıktıdan temizlenir; farklı geçerli parçalar korunur. Gerçek örnekte temizlenmiş 301.214 üçgenli modelin sınırları ve hacmi korundu; yeniden açılan STL kapalı ve 100 mm olarak doğrulandı. 3MF kaydı ve düzenleyiciye aktarımı da gerçek modelle sınandı. `tests/local-ai-mesh.py`, kurulu YZ ortamının Python'u ile ağ/inferans gerektirmeden bu temizliğin kapalı yüzey, hacim ve ayrı parçaları korumasını kontrol eder.
-
-## 3.10 — Kendi görselinden yerel 3D
-
-**Yazı / görselden 3D · Yerel YZ** sekmesindeki **Görsel yükle / buraya sürükle** alanı PNG, JPG ve WEBP kabul eder. Metin yazmak gerekmez; yüklenen görsel SD-Turbo'da yeniden çizilmez. Görseli kontrol edip **Görseli onayla ve 3D üret** düğmesine basın. Bu alan tam 3D biçim tahmini yapar; önceki **Görselden 3D** sekmesindeki vektör/kabartma iş akışı ayrıca korunur.
-
-**Yüklerken arka planı ayır** seçeneği yüklemeden önce seçilir. Gerçek saydamlığı olan PNG/WEBP'de mevcut alfa kanalı korunur ve tekrar otomatik kesim yapılmaz. Diğer görsellerde isteğe bağlı yerel arka plan ayırma uygulanır. Önizlemedeki sonuç doğru değilse bu seçeneği değiştirip görseli tekrar yükleyin. Kaynak dosya değiştirilmez. En fazla 25 MB / 25 milyon piksellik görsel kabul edilir; çalışma kopyasının uzun kenarı otomatik olarak 1024'e sığdırılır. Piksel/kalite parametresi ayarlamanız gerekmez.
-
-Masaüstünde dosya yerel IPC ile, LAN tarayıcısında aynı ağdaki sunucu bilgisayarına boyut ve tür kontrolü olan bir istekle iletilir. API dosya yolu veya harici görsel URL'si kabul etmez. 3D üretimi bilgisayarda kalır; yeni model indirmesi veya API anahtarı gerekmez (3.9 motoru kurulmuşsa). Sonuç döndürülebilir, STL/3MF/OBJ kaydedilebilir ve düzenleyiciye aktarılabilir. Tek fotoğrafın görünmeyen yüzeyi model tarafından tahmin edilir; çıktı hâlâ tek renk geometridir.
-
-Gerçek masaüstü doğrulamasında bir çaydanlık PNG'si dosya seçicisinden yüklendi. Metin girilmeden ve SD-Turbo çağrılmadan yerel 3D üretimi, önizleme, STL/3MF kaydı ve düzenleyiciye aktarım tamamlandı. Bu bilgisayarda hızlı taslak akışı yaklaşık 448 saniye sürdü; 208.784 üçgenli STL yeniden açılıp kapalı ve 100 mm olarak doğrulandı. Birim testleri saydamlığı ve arka planı korumayı; arayüz testi dosya seçiciyi ve 3D önizleme üstüne sürüklemeyi; LAN testi 4 KB'den büyük görsel isteğinin doğru uçta kabul edilmesini sınar. Arayüz testinin şekli açıkça test verisidir; gerçek çıkarım doğrulaması bundan ayrıdır.
-
-
-## 3.11 — AMD ekran kartıyla yerel YZ hızlandırma
-
-Yerel YZ sekmesindeki **Hesaplama** seçimi **Otomatik · GPU öncelikli**, **Ekran kartı · AMD** ve **İşlemci** sunar. Windows'ta önce normal yerel motoru, ardından **AMD GPU hızlandırmayı kur** seçeneğini kullanın. AMD'nin [resmî TheRock / ROCm paketleri](https://github.com/ROCm/TheRock/blob/main/RELEASES.md), sabit PyTorch 2.12.0+rocm10.1.0 / torchvision 0.27.0+rocm10.1.0 sürümleriyle ayrı `venv-rocm` ortamına kurulur. Mimariye özel çekirdekler otomatik seçilir. İşlemci ortamı korunur; sistem sürücüsü değiştirilmez. İlk kurulum birkaç GB daha indirir; üretim tamamen yereldir. Diğer kartlar ve macOS bu sürümde doğrulanmış GPU desteği olarak sunulmaz; işlemci yolu kullanılabilir.
-
-Windows 10, RX 6700 XT (gfx1031, 12 GB) üzerinde gerçek Hunyuan3D üretimi doğrulandı. Aynı çaydanlık görseli, varyasyon 42, hızlı taslak ve 100 mm için önceki işlemci akışı **448,493 sn**, GPU çıkarımı **159,372 sn** sürdü (yaklaşık **2,8 kat**; işlemci ölçümü ayrıca önizleme/çıktı kontrollerini içerir). GPU çıktısı 208.808 üçgenli, kapalı, tutarlı yüz yönlerine sahip ve 100 mm'dir. İşlemci çıktısıyla sınırlar 0,05 mm içinde, hacim farkı %0,001'in altındadır. Sayısal yuvarlama nedeniyle birebir aynı üçgen sayısı beklenmez. Süre görsele, ayrıntı seçimine ve donanıma göre değişir.
-
-SD-Turbo görsel üretimi, Hunyuan görüntü kodlayıcısı, biçim modeli ve yüzey çözücüsü GPU'ya taşınır. Bileşenler sırayla yüklenir; dikkat hesaplaması bellek sınırına göre parçalanır. Çeviri, arka plan ayırma, yüzey temizleme, dosya hazırlama ve mevcut model kesim/doldurma işlemleri işlemcide kalır. 3D önizleme zaten donanım hızlandırmalı WebGL kullanır. Bu güncelleme bütün RAM/CPU kullanımını sıfırlamaz.
-
-Otomatik seçimde GPU hatası olursa aynı referans, varyasyon ve yükseklikle işlemcide bir kez yeniden denenir; arayüz bu dönüşü gösterir. Zorunlu ekran kartı seçiminde hata doğrudan gösterilir. İptal edilmiş işlem yeniden başlatılmaz. Son kullanıcı modeli test/karşılaştırma sırasında değiştirilmez. `tests/gpu-attention.py` parçalı dikkat sonucunu PyTorch ile karşılaştırır; Node testleri seçim, işlemciye geri dönüş ve iptali sınar.
-
-
-## 3.12 — Farklı donanımlara uyarlama
-
-İşlemci markası GPU seçimini belirlemez. Intel veya AMD işlemcide aynı CPU yolu çalışır. Ekran kartları işletim sisteminden ayrı algılanır: NVIDIA için ayrı `venv-cuda` ortamında PyTorch 2.9.1 / torchvision 0.24.1 ve resmî CUDA 12.8 paketleri; Windows AMD için mevcut ayrı ROCm ortamı kullanılır. **Donanıma uygun GPU motorunu kur** algılanan karta göre kurulum seçer. NVIDIA/AMD karışık bilgisayarda NVIDIA kurulum yolu önceliklidir. Aynı motorun birden fazla kartında en yüksek toplam VRAM'e sahip kart seçilir. Matris, dikkat ve evrişim testleri geçmeden GPU hazır olarak işaretlenmez. Desteklenmeyen kart/sürücü, Intel GPU ve macOS için CPU yolu korunur. macOS MPS desteği bu sürümde sunulmaz. Linux için NVIDIA kurulum yolu vardır; dağıtım ve NVIDIA sürücü uyumu ayrıca gerekir.
-
-RAM toplamı, o an boş RAM ve kullanılabilir CPU çekirdekleri her işte yeniden ölçülür. Bellek baskısında en fazla 2 iş parçacığı, 16 MB dikkat parçaları ve 512 noktalı yüzey sorguları; dengeli sistemde en fazla 6 iş parçacığı, 64 MB ve 2048 sorgu; en az 32 GB RAM ve 12 GB boş bellekte en fazla 12 iş parçacığı, 128 MB ve 4096 sorgu kullanılır. Her durumda en fazla çekirdeklerin yarısı ayrılır (en az 1). Kalite seçimi, yüzey çözünürlüğü, varyasyon ve ölçüler korunur. Bunlar performans politikalarıdır; bütün donanımlarda en hızlı ayar veya sıfır bellek hatası garantisi değildir.
-
-Büyük Hunyuan bileşenleri boş parametrelerle oluşturulur ve ağırlıklar bir kez bağlanır; gereksiz ilk parametre kopyası kaldırılır. GPU'ya taşınmadan önce boş VRAM ve bileşen boyutu kontrol edilir; büyük aşama sığmayacaksa CPU'da yürütülür. GPU bellek kontrolünde etkinleştirmeler için 2 GB pay bırakılır. SD-Turbo düşük boş VRAM'de bileşenleri sırayla GPU'ya taşır ve VAE'yi parçalara ayırır. Yetersiz bellek veya başka GPU hatasında otomatik mod aynı girdiyi CPU'da bir kez dener; zorunlu GPU modu hatayı gösterir. 8 GB altı toplam RAM veya 1,5 GB'den az boş RAM'de YZ üretimi başlatılmaz ve açıklama gösterilir. Bu sadece başlatma alt sınırıdır; **16 GB veya daha fazla RAM önerilir**, 8 GB'de tüm işlerin tamamlanacağı garanti edilmez. Ana vektör ve 3D düzenleme alanları bu YZ sınırından bağımsızdır. Güçsüz cihazlar LAN üzerinden daha güçlü bilgisayardaki motoru kullanabilir.
-
-Donanım kartında üretimi yapan bilgisayarın CPU/RAM/iş parçacığı bilgileri gösterilir; LAN'da bunlar sunucuya aittir. Önizleme ise her istemcinin kendi donanımına göre ayarlanır: az bellek/çekirdek veya yazılımsal WebGL'de piksel oranı 1 ve 1024 gölge; diğerlerinde en fazla 2 ve 2048 gölge. Gölge ve derinlik gösterimi korunur; dışa aktarılan geometri bundan etkilenmez.
-
-**Doğrulama sınırı:** Bu geliştirme bilgisayarında Windows RX 6700 XT ile yeni yükleyicinin gerçek üretimi tamamlandı: aynı çaydanlık, hızlı taslak, 100 mm; 129,709 saniye, 208.806 üçgen, kapalı yüzey, işlemci çıktısına göre hacim farkı %0,001'in altında. Bunlar tek makinenin ölçümleridir. NVIDIA donanımında, başka RAM miktarlarında, Linux veya macOS'ta gerçek uçtan uca üretim burada yapılmadı. Kurulum yönlendirmesi, bellek politikaları, CUDA hata geri dönüşü ve düşük VRAM kararları otomatik testlerle sınandı; bu testler başka bir fiziksel kartta üretim doğrulaması sayılmaz. NVIDIA paketleri için [resmî PyTorch sürüm talimatları](https://pytorch.org/get-started/previous-versions/), bileşen aktarımı için [Diffusers bellek optimizasyonu](https://github.com/huggingface/diffusers/blob/main/docs/source/en/optimization/memory.md) kullanılır.
-
-
-## 3.13 — Yeniden kullanma, doğru görsel hazırlama ve alternatif Mini motoru
-
-Akış aynı kalır: serbest yazıdan kontrol görseli veya yüklenen PNG/JPG/WEBP → görseli onayla → gerçek 3D model → önizleme / STL, 3MF, OBJ. Hazır şekil seçimi veya bulut üretim API'si eklenmez. CPU / NVIDIA CUDA / Windows AMD ROCm ve donanıma göre RAM/çekirdek politikaları korunur. Diğer fiziksel kartlarda doğrulama yapılmış sayılmaz.
-
-**Görsele sadakat:** Kaynak dosya ve onaylanan RGBA görseli korunur. Model girdisi ayrı hazırlanır. Önceki Hunyuan hazırlayıcısının son satır/sütunu hariç tutan kırpması ve peş peşe yeniden boyutlandırması değiştirilir: görünür alan dahilî sınırlarla kırpılır, oranı korunarak ortalanır ve tek LANCZOS boyutlandırması yapılır. İnce/ayrı parçaları kaldıran morfolojik aşındırma kullanılmaz. Yalnızca alfa 0–2/255 düzeyindeki görünmez sayılabilecek pus çerçeve dışı bırakılır; opak arka planı koruma ve mevcut saydamlığı tekrar kesmeme davranışı sürer. Çalışma kopyası normal donanımda en fazla 2048, düşük bellekli istemci/sunucuda 1024 uzun kenardır. Tarayıcı aktarım sınırına sığmazsa PNG çalışma kopyası küçültülür; JPEG'e çevrilip saydamlık kaybedilmez.
-
-**Sınırlı yerel önbellek:** Aynı görselin arka plan ayrımı, aynı metin/varyasyonun kontrol görseli, 3D görsel özellikleri, üretilen latent biçim ve çıkarılmış yüzey yeniden kullanılabilir. Aynı varyasyonda yalnızca yükseklik değişimi YZ çıkarımı yapmaz. Turbo taslak/ayrıntılı yüzey geçişi görüntü kodlayıcısını ve biçim modelini tekrar çalıştırmaz. Boş varyasyon alanı aynı referansın mevcut varyasyonunu korur; farklı sonuç için numarayı değiştirin. Yeni kaynak görsel, varyasyon, üretim motoru veya hassasiyet uygun önbellek anahtarını değiştirir. Ağırlık/ayar dosyalarının kimliği de anahtara dahildir. Kullanılan ara sonuç arayüz durumunda belirtilir; bu yeni bir YZ üretimi olarak sunulmaz.
-
-`Yerel-YZ/cache-v3` yalnızca atılabilir sayısal NPZ verileri içerir; pickle yüklenmez. Kayıtlar atomik yazılır, bozuk veriler kullanılmaz. Kayıt başına 64 MB, toplamda düşük RAM'de 256 MB, dengeli profilde 1 GB, yüksek profilde 2 GB ve en fazla 256 kayıt sınırı vardır; en eski kullanılanlar ayıklanır. Bu sınır kullanıcıya ait model/iş klasörlerini silmez. Disk dolu veya önbellek yazılamazsa geçerli üretim başarısız sayılmaz.
-
-**Donanıma uygun hassasiyet:** Otomatik modda GPU görsel üretimi, görüntü kodlayıcısı ve biçim örneklemesi FP16 kullanabilir; CPU ve 3D yüzey çözümü FP32 kalır. Küçük VRAM'de sığmayan aşamalar CPU'ya geçer. Sayısal taşma/çalışma hatasında aynı GPU'da FP32 ile yeniden denenir; otomatik aygıt modunda bu da başarısız olursa CPU denenir. Zorunlu GPU modunda CPU'ya gizlice geçilmez. Tam hassasiyet seçeneği her zaman kullanılabilir. İptal edilmiş işlem yeniden başlatılmaz. FP16 her kartta desteklenmiş veya her görselde aynı sonuç vermiş sayılmaz.
-
-**Alternatif Mini:** Turbo 5 adımlı motor, taslakta 192 ve ayrıntılı yüzeyde 256 çıkarım çözünürlüğünü korur. İsteğe bağlı **Alternatif Mini motorunu kur · 4 GB** ayrı, distile edilmemiş Hunyuan3D Mini ve ona ait VAE'yi aynı sabit `SHAPE` revizyonundan indirir. Mini seçeneği 30 adım, CFG ve 256 yüzey çözünürlüğü kullanır; aynı Turbo modelinin yalnızca üçgen sayısı artırılmış hali değildir. Modelin latent boyutu ve giriş çözünürlüğü de farklı olduğundan 30 adım her zaman daha yavaş veya daha iyi demek değildir. Bazı görsellerde Turbo daha sadık olabilir; iki seçenek korunur. Eksik Mini dosyasında üretim açıkça engellenir, üretim sırasında gizli indirme yapılmaz.
-
-İndirici varsa aynı donmuş görüntü kodlayıcısının yerel ağırlıklarını yeniden kullanır ve kalan aralıkları indirir. Son dosyanın **tamamı resmî SHA-256** ile eşleşmeden kurulmuş sayılmaz. Ortak ağırlıklar farklıysa tam indirmeye döner. Bu optimizasyon yanlış modele veya doğrulanmamış ağırlığa izin vermez; eşleşen yerel dosya kopyaları da atomik tamamlanır.
-
-**Gerçek ölçümler:** Windows RX 6700 XT üzerinde aynı kaynak çaydanlık/varyasyon 42/100 mm için yeni hazırlamayla Turbo FP32 **117,196 sn**, otomatik FP16 **71,962 sn** sürdü. Aynı 3D yüzeyden 150 mm çıktı **4,188 sn**; aynı latent biçimden ayrıntılı yüzey **17,040 sn** sürdü. Ayrı Mini 30 adım **41,499 sn** sürdü. Son üçü birbirinden farklı işlemlerdir; önbellek süreleri yeni YZ üretim süresi olarak kıyaslanmaz. Tüm örnek geometri çıktıları kapalı, tutarlı yüz yönlerine sahip ve istenen yükseklikte doğrulandı. Tek çaydanlıkta sabit ortografik ön siluet karşılaştırması önceki Turbo hazırlamada 0,8076 IoU, yeni Turbo FP32'de 0,8182, yeni otomatikte 0,8182 ve Mini'de 0,7981 verdi. Bu yalnızca o görselin ön siluet kıyasıdır; tam 3D benzerlik/arka yüz doğruluğu puanı değildir. Mini'nin her zaman daha iyi olmadığı bu örnekte de görüldü. Yeni yazıdan kontrol görseli **38,443 sn**, aynı metin/varyasyonun tekrar açılması **1,318 sn** sürdü.
-
-Çıktı hâlâ tek renk geometridir; bu sürümde generatif doku boyama ve çok açıdan giriş motoru eklenmedi. Tek fotoğrafta görünmeyen yüzeyler tahmin edilir. Geliştirme, yazı/görselden 3D kapsamındaki hız ve girdi sadakatine odaklanır. Yeni testler `tests/production-cache.py`, `tests/model-reuse.py` ve Node yerel motor testlerindedir; mock kurulum ve arayüz testleri gerçek GPU üretimiyle karıştırılmaz.
-
-
-## 3.14 — Boş açılış, tamamlanan kurulum ve ince yüzey
-
-Masaüstü motoru açılışta `last-concept-v2.json` / `last-model-v2.json` dosyalarından görsel veya model geri yüklemez. Dosyalar silinmez. Tarayıcı/LAN oturumunda da sunucuda daha önce duran örnek, referans ve model kendiliğinden görüntülenmez; yeni sekme/sayfa yenilemesi boş başlar. Aynı açık oturum içinde kullanıcının başlattığı yükleme ve üretim normal çalışır. Ana görsel/vektör ve 3D düzenleme alanları da başlangıçta boştur.
-
-Yerel motor hazır olduğunda ana kurulum düğmesi ve ilk kurulum açıklaması gizlenir. GPU hazır olduğunda GPU kurulum düğmesi gizlenir. Eksik alternatif Mini motoru ana ekranda tekrar kurulum istemez; isteğe bağlı kapalı bir bölümden kurulabilir. Kurulum yapılırken ilerleme gösterilir; bir kurulumun yapılması diğer, isteğe bağlı motorun kurulduğu anlamına gelmez.
-
-Kontrol görseli tarifine otomatik eklenen `3D sculpture` yönlendirmesi kaldırıldı; kaynak görseli baştan heykel gibi düzleştirmek yerine keskin sınır ve yüzey ayrıntısı yönlendirmesi kullanılır. Görsel hâlâ yerel SD-Turbo modelinin 512 × 512 üretimidir; bu değişiklik yeni bir yüksek kapasiteli görsel modeli değildir ve ince ayrıntı garantisi vermez. Eski tarif düzenine ait kontrol görseli önbelleği kullanılmaz.
-
-Turbo için ayrı **İnce yüzey** seçeneği 384 çıkarım çözünürlüğü kullanır; dengeli 256, taslak 192 olarak korunur. Aynı varyasyonda mevcut latent biçim yeniden kullanılabilir. Bu seçenek üçgen sayısını artırır ve modeldeki ince yüzeyi daha sık örnekler; kayıp bir el/aksesuarı veya kaynak dokusunu yeniden tasarlamaz. Daha fazla süre ve bellek ister. Gerçek çaydanlık örneğinde 838.352 üçgen / 419.174 köşe üretildi; masaüstü önizleme ve STL/3MF dışa aktarma test edildi. Başlangıçta eski JSON dosyalarının mevcut olması ve LAN sayfasının üretimden sonra yenilenmesi otomatik testlerde özellikle sınanır.
+Each model is downloaded from its publisher's repository at a pinned revision and verified during installation. Model weights are not included in this repository. Check each model's repository for its license and usage conditions before installing it.

@@ -2,7 +2,7 @@ import {createRequire} from 'node:module';
 import assert from 'node:assert/strict';
 import {mkdir} from 'node:fs/promises';
 const require=createRequire(import.meta.url);
-const {chromium}=require(process.env.PLAYWRIGHT_PATH || 'C:/Users/tuwturn/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const {chromium}=require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const browser=await chromium.launch({channel:'chrome',headless:true,args:['--enable-unsafe-swiftshader']});
 try{
  const page=await browser.newPage({viewport:{width:1460,height:960}});

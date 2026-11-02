@@ -32,8 +32,8 @@ class ProductionTests(unittest.TestCase):
         self.assertNotEqual(real['revision'],fast['revision'])
         self.assertEqual((real['size'],real['steps'],real['guidance']),(1024,30,5.0))
         self.assertEqual((fast['size'],fast['steps'],fast['guidance']),(512,4,0.0))
-        self.assertIn('realistic photograph',build_image_prompt('a child','realistic'))
-        self.assertIn('a wooden chair',build_image_prompt('a wooden chair','realistic'))
+        self.assertIn('realistic color photograph',build_image_prompt('a person','realistic',style='realistic'))
+        self.assertIn('a wooden object',build_image_prompt('a wooden object','realistic'))
         self.assertIn('head and feet visible',build_image_prompt('a person','realistic',person=True))
         self.assertNotIn('full-length',build_image_prompt('a portrait bust of a person','realistic'))
         self.assertNotIn('photograph',build_image_prompt('a monochrome pencil sketch','realistic'))
@@ -41,8 +41,8 @@ class ProductionTests(unittest.TestCase):
         with self.assertRaises(ValueError):image_parameters('unknown')
     def test_single_word_person_is_disambiguated_without_replacing_explicit_anatomy(self):
         self.assertEqual(normalize_translated_subject('human'),'a person')
-        self.assertEqual(normalize_translated_subject('human skeleton'),'human skeleton')
-        self.assertEqual(normalize_translated_subject('a human-shaped glass sculpture'),'a human-shaped glass sculpture')
+        self.assertEqual(normalize_translated_subject('human anatomy'),'human anatomy')
+        self.assertEqual(normalize_translated_subject('a glass human figure'),'a glass human figure')
     def test_xl_rejects_insufficient_cpu_ram_before_loading_weights(self):
         from diffusers import StableDiffusionXLPipeline
         with tempfile.TemporaryDirectory() as home:
@@ -50,15 +50,15 @@ class ProductionTests(unittest.TestCase):
             for folder,name in [('unet','diffusion_pytorch_model.fp16.safetensors'),('vae','diffusion_pytorch_model.fp16.safetensors'),('text_encoder','model.fp16.safetensors'),('text_encoder_2','model.fp16.safetensors')]:
                 path=model/folder/name;path.parent.mkdir(parents=True,exist_ok=True);path.touch()
             with patch('psutil.virtual_memory',return_value=types.SimpleNamespace(total=8*1024**3,available=4*1024**3)),patch.object(StableDiffusionXLPipeline,'from_pretrained') as load:
-                with self.assertRaisesRegex(RuntimeError,'24 GB RAM'):concept(root,{'imageEngine':'xl','backend':'cpu','prompt':'a chair','language':'en','seed':42,'precision':'auto'},output)
+                with self.assertRaisesRegex(RuntimeError,'24 GB RAM'):concept(root,{'imageEngine':'xl','backend':'cpu','prompt':'a wooden object','language':'en','seed':42,'precision':'auto'},output)
                 load.assert_not_called()
 
     def test_prompt_does_not_invent_material_or_pattern_but_keeps_user_requests(self):
         human=build_image_prompt('human')
-        self.assertIn('showing human,',human)
+        self.assertIn('of human,',human)
         for forbidden in ['intricate','sculpture','product photograph','texture','woven','metallic']:
             self.assertNotIn(forbidden,human)
-        self.assertIn('a woven basket,',build_image_prompt('a woven basket'))
+        self.assertIn('a woven object,',build_image_prompt('a woven object'))
         self.assertIn('a realistic person in cotton clothes,',build_image_prompt('a realistic person in cotton clothes'))
         self.assertNotIn('color image',build_image_prompt('a monochrome pencil sketch of a chair'))
     def test_background_reuse_keeps_a_new_reference_name_and_seed(self):

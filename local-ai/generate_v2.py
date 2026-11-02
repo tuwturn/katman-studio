@@ -1,8 +1,9 @@
 """Offline, two-stage free text -> approved concept -> real 3D geometry."""
 import gc, json, os, pathlib, socket, sys, time, hashlib,re
-from install_v2 import SOURCE,SHAPE,IMAGE,IMAGE_XL,IMAGE_REALISTIC,VAE_XL_FP16
+from install_v2 import SOURCE,SHAPE,IMAGE,IMAGE_XL,IMAGE_REALISTIC,VAE_XL_FP16,IMAGE_BASE
 from production_cache import ProductionCache,key_for,file_identity
 from reference_image import FaithfulImageProcessor
+from prompt_policy import styled_prompt,negative_prompt,figure_size,normalize_caption,subject_caption,close_view_requested
 
 def report(message, **extra):
     print(json.dumps({'message':message,**extra}),flush=True)
@@ -25,7 +26,7 @@ def normalize_translated_subject(prompt):
     prompt=str(prompt).strip()
     # Standalone "human" is often interpreted as anatomy/skin in image captions.
     # This is a lexical equivalent, not a predefined figure or a material override.
-    return 'a person' if prompt.casefold() in ['human','human being'] else prompt
+    return 'a person' if prompt.casefold() in ['human','human being'] else normalize_caption(prompt)
 
 def translate(home,job):
     if job.get('language')=='en':return normalize_translated_subject(job['prompt'])
@@ -37,30 +38,20 @@ def translate(home,job):
     translator=MarianMTModel.from_pretrained(folder,local_files_only=True).eval()
     with torch.inference_mode():
         tokens=tokenizer([job['prompt']],return_tensors='pt',truncation=True,max_length=256)
-        output=translator.generate(**tokens,max_new_tokens=256)
+        output=translator.generate(**tokens,max_new_tokens=256,num_beams=5)
         prompt=tokenizer.decode(output[0],skip_special_tokens=True)
     del translator,tokenizer,tokens,output;gc.collect()
     return normalize_translated_subject(prompt)
 
 def image_parameters(engine):
+    if engine=='base':return {'folder':'image-base','revision':IMAGE_BASE,'steps':30,'size':1024,'guidance':6.5,'negative':None}
     if engine=='realistic':return {'folder':'image-realistic','revision':IMAGE_REALISTIC,'steps':30,'size':1024,'guidance':5.0,'negative':'close-up, headshot, cropped, out of frame, distorted anatomy, unnatural proportions, deformed hands, extra limbs, duplicate body, blurry'}
     if engine=='xl':return {'folder':'image-xl','revision':IMAGE_XL,'steps':4,'size':512,'guidance':0.0,'negative':None}
     if engine=='turbo':return {'folder':'image','revision':IMAGE,'steps':1,'size':512,'guidance':0.0,'negative':None}
     raise ValueError('Geçersiz görsel motoru.')
 
-def close_view_requested(prompt):
-    return bool(re.search(r'\b(?:portrait|headshot|bust|close[- ]up)\b',prompt,re.I))
-
-def build_image_prompt(prompt,engine='turbo',person=False):
-    # Default presentation is neutral; never invent material or surface motifs.
-    prompt=str(prompt).strip()
-    explicit_style=any(word in prompt.lower() for word in ['monochrome','black and white','grayscale','pencil','sketch','line drawing','silhouette'])
-    if engine=='realistic' and close_view_requested(prompt):return ('A clear image showing ' if explicit_style else 'A realistic photograph of ')+prompt+', soft lighting, plain white background'
-    if engine=='realistic' and not explicit_style:
-        if person:return 'A full body photograph of '+prompt+', head and feet visible, entire figure in frame, realistic proportions, soft lighting, plain white background'
-        return 'A wide full-length realistic photograph of '+prompt+', entire subject visible from top to bottom, centered with white space around it, natural proportions, soft lighting'
-    prefix='A clear image showing ' if explicit_style else 'A clear color image showing '
-    return prefix+prompt+', full body, entire subject visible, plain white background'
+def build_image_prompt(prompt,engine='turbo',person=False,style=None,single=False):
+    return styled_prompt(prompt,style or 'auto',person,single)
 
 def portrait_subject(pipe,prompt,device):
     """Use the installed CLIP encoder to choose figure framing, not a figure template."""
@@ -110,12 +101,12 @@ def decode_realistic_latents(vae,latents,device,precision='auto'):
 def concept(home,job,output):
     import numpy as np
     from PIL import Image as PILImage
-    image_engine=job.get('imageEngine','turbo');settings=image_parameters(image_engine);is_xl=image_engine in ['xl','realistic'];steps=settings['steps']
+    image_engine=job.get('imageEngine','turbo');settings=image_parameters(image_engine);is_xl=image_engine in ['xl','realistic','base'];quality_image=image_engine in ['realistic','base'];steps=settings['steps'];style=job.get('imageStyle','auto');single=job.get('singleSubject',True)
     model=home/'models-v2'/settings['folder']
     weight_files=[('unet','diffusion_pytorch_model.fp16.safetensors'),('vae','diffusion_pytorch_model.fp16.safetensors'),('text_encoder','model.fp16.safetensors')]+([('text_encoder_2','model.fp16.safetensors')] if is_xl else [])
     identity=[settings['revision'],*[file_identity(model/folder/name) for folder,name in weight_files]]
-    if image_engine=='realistic':identity.extend([VAE_XL_FP16,file_identity(home/'models-v2'/'image-realistic-vae'/'diffusion_pytorch_model.safetensors')])
-    concept_key=key_for('concept-realism-v9',image_engine,settings,identity,job['prompt'],job.get('language','tr'),job['seed'],job.get('backend','cpu'),job.get('precision','auto'),job.get('runtime',{}))
+    if quality_image:identity.extend([VAE_XL_FP16,file_identity(home/'models-v2'/'image-realistic-vae'/'diffusion_pytorch_model.safetensors')])
+    concept_key=key_for('concept-styles-v10',image_engine,style,single,settings,identity,job['prompt'],job.get('language','tr'),job['seed'],job.get('backend','cpu'),job.get('precision','auto'),job.get('runtime',{}))
     cache=ProductionCache(home,job.get('resources',{}).get('memoryMode','balanced'))
     cached=cache.load(concept_key)
     if cached is not None:
@@ -134,10 +125,10 @@ def concept(home,job,output):
     from gpu_runtime import dtype_for,release_device
     init_compute(job)
     prompt=translate(home,job)
-    image_prompt=build_image_prompt(prompt,image_engine)
-    negative=settings['negative']
-    if negative and close_view_requested(prompt):negative=negative.removeprefix('close-up, headshot, cropped, out of frame, ')
-    report('Tariften kontrol görseli üretiliyor · '+('RealVisXL' if image_engine=='realistic' else 'SDXL-Turbo' if is_xl else 'SD-Turbo'),phase='concept',translated=prompt,imageEngine=image_engine,imagePrompt=image_prompt)
+    subject_caption(prompt,single)
+    image_prompt=build_image_prompt(prompt,image_engine,style=style,single=single)
+    negative=negative_prompt(prompt,style,single=single) if quality_image else None
+    report('Tariften kontrol görseli üretiliyor · '+('SDXL Base' if image_engine=='base' else 'RealVisXL' if image_engine=='realistic' else 'SDXL-Turbo' if is_xl else 'SD-Turbo'),phase='concept',translated=prompt,imageEngine=image_engine,imagePrompt=image_prompt,imageStyle=style,singleSubject=single)
     device=job['_device'];dtype=dtype_for(device,job.get('precision','auto'))
     if is_xl:
         import psutil
@@ -146,14 +137,15 @@ def concept(home,job,output):
         if dtype==torch.float16 and memory.total<15*1024**3:raise RuntimeError('SDXL için en az 16 GB RAM gerekli; hafif motoru seçin.')
     pipeline_class=StableDiffusionXLPipeline if is_xl else StableDiffusionPipeline
     components={'add_watermarker':False} if is_xl else {}
-    if image_engine=='realistic':components['vae']=AutoencoderKL.from_pretrained(str(home/'models-v2'/'image-realistic-vae'),torch_dtype=dtype,local_files_only=True)
+    if quality_image:components['vae']=AutoencoderKL.from_pretrained(str(home/'models-v2'/'image-realistic-vae'),torch_dtype=dtype,local_files_only=True)
     pipe=pipeline_class.from_pretrained(str(model),variant='fp16',torch_dtype=dtype,local_files_only=True,**components)
-    person=image_engine=='realistic' and portrait_subject(pipe,prompt,device)
-    width,height=(768,1344) if person else (settings['size'],settings['size'])
+    person=quality_image and portrait_subject(pipe,prompt,device)
+    width,height=figure_size(prompt,person) if quality_image else (settings['size'],settings['size'])
     if person:
-        image_prompt=build_image_prompt(prompt,image_engine,person=True)
-        report('Tam figür kadrajı · dikey görüntü',phase='concept',imagePrompt=image_prompt)
-    if image_engine=='realistic':pipe.scheduler=DPMSolverMultistepScheduler.from_config(pipe.scheduler.config,algorithm_type='dpmsolver++',use_karras_sigmas=True,solver_order=2)
+        image_prompt=build_image_prompt(prompt,image_engine,person=True,style=style,single=single)
+        negative=negative_prompt(prompt,style,person=True,single=single)
+        report('Tam figür kadrajı',phase='concept',imagePrompt=image_prompt)
+    if quality_image:pipe.scheduler=DPMSolverMultistepScheduler.from_config(pipe.scheduler.config,algorithm_type='dpmsolver++',use_karras_sigmas=True,solver_order=2)
     if is_xl and device.type=='cuda':
         if torch.cuda.mem_get_info(device)[0]<(7 if dtype==torch.float16 else 14)*1024**3:pipe.enable_sequential_cpu_offload(gpu_id=device.index)
         else:pipe.enable_model_cpu_offload(gpu_id=device.index)
@@ -166,12 +158,12 @@ def concept(home,job,output):
             raise RuntimeError('Tarif bu görsel modeli için çok uzun. Ana nesne ve önemli ayrıntıları koruyarak kısaltın; tarifin sonu sessizce atılmadı.')
     pipe.set_progress_bar_config(disable=True);pipe.enable_attention_slicing();pipe.enable_vae_slicing()
     def progress(pipe,step,timestep,kwargs):
-        if image_engine=='realistic' and device.type=='cuda':torch.cuda.synchronize(device)
-        report(f'Kontrol görseli üretiliyor · {step+1}/{steps}',phase='concept',progress=(step+1)*(90 if image_engine=='realistic' else 100)/steps)
+        if quality_image and device.type=='cuda':torch.cuda.synchronize(device)
+        report(f'Kontrol görseli üretiliyor · {step+1}/{steps}',phase='concept',progress=(step+1)*(90 if quality_image else 100)/steps)
         return kwargs
     with torch.inference_mode():
-        sampled=pipe(image_prompt,negative_prompt=negative,num_inference_steps=steps,guidance_scale=settings['guidance'],height=height,width=width,generator=torch.Generator('cpu').manual_seed(job['seed']),callback_on_step_end=progress,output_type='latent' if image_engine=='realistic' else 'np').images
-    if image_engine=='realistic':
+        sampled=pipe(image_prompt,negative_prompt=negative,num_inference_steps=steps,guidance_scale=settings['guidance'],height=height,width=width,generator=torch.Generator('cpu').manual_seed(job['seed']),callback_on_step_end=progress,output_type='latent' if quality_image else 'np').images
+    if quality_image:
         latents=sampled.detach().cpu();vae=pipe.vae;pipe.remove_all_hooks()
         del pipe,sampled;release_device(device)
         pixels=decode_realistic_latents(vae,latents,device,job.get('precision','auto'))
@@ -189,7 +181,7 @@ def concept(home,job,output):
     mask=np.asarray(rgba.getchannel('A'))
     if (mask>128).sum()<512:raise RuntimeError('Görselde ayrılabilir bir nesne bulunamadı. Tarifi değiştirip tekrar üretin.')
     rgba.save(output / 'reference.png')
-    metadata={'prompt':job['prompt'],'translated':prompt,'image_prompt':image_prompt,'image_engine':image_engine,'image_steps':steps,'image_size':[width,height],'negative_prompt':negative,'seed':job['seed'],'language':job.get('language','tr')}
+    metadata={'prompt':job['prompt'],'translated':prompt,'image_prompt':image_prompt,'image_engine':image_engine,'image_style':style,'single_subject':single,'image_steps':steps,'image_size':[width,height],'negative_prompt':negative,'seed':job['seed'],'language':job.get('language','tr')}
     (output / 'concept.json').write_text(json.dumps(metadata,ensure_ascii=False),encoding='utf-8')
     cache.save(concept_key,concept=np.asarray(image),reference=np.asarray(rgba),metadata=np.frombuffer(json.dumps(metadata,ensure_ascii=False).encode('utf-8'),dtype=np.uint8))
     report('Kontrol görseli hazır. Doğru görünüyorsa onaylayıp 3D üretin.',phase='concept-ready',translated=prompt)

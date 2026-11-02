@@ -9,7 +9,7 @@ import {STLLoader} from 'three/addons/loaders/STLLoader.js';
 import {fromSolid,toSolid} from '../src/mesh-ops.js';
 import {exportSTL} from '../src/core.js';
 import {createWebServer} from '../server.mjs';
-const require=createRequire(import.meta.url),{chromium,_electron}=require(process.env.PLAYWRIGHT_PATH||'C:/Users/tuwturn/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const require=createRequire(import.meta.url),{chromium,_electron}=require(process.env.PLAYWRIGHT_PATH||'playwright');
 const wasm=await Module();wasm.setup();const M=wasm.Manifold,base=M.cube([20,20,4]),hole=M.cube([4,4,2]).translate([8,8,2]),source=base.subtract(hole);await mkdir('test-results',{recursive:true});await writeFile('test-results/fill-engraved.stl',exportSTL([fromSolid(source)]));[base,hole,source].forEach(s=>s.delete());
 const server=createWebServer();await new Promise(r=>server.listen(0,'127.0.0.1',r));const native=process.env.KATMAN_NATIVE==='1',browser=native?await _electron.launch({executablePath:path.resolve('Masaustu/Katman Studio/Katman Studio.exe'),env:{...process.env,KATMAN_TEST:'1'},args:['--user-data-dir='+path.resolve('test-results/native-fill-profile'),...(process.env.KATMAN_GL==='software'?['--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader']:[])]}):await chromium.launch({channel:'chrome',headless:true,args:['--enable-unsafe-swiftshader']});
 try{
